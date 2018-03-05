@@ -493,7 +493,10 @@ static irqreturn_t regmap_irq_thread(int irq, void *d)
 		if (data->status_buf[i] && (chip->ack_base || chip->use_ack)) {
 			reg = chip->ack_base +
 				(i * map->reg_stride * data->irq_reg_stride);
-			ret = regmap_write(map, reg, data->status_buf[i]);
+			ret = regmap_irq_update_bits(d, reg,
+						     data->status_buf[i],
+						     chip->ack_invert ?
+						     0x00 : 0xFF);
 			if (ret != 0)
 				dev_err(map->dev, "Failed to ack 0x%x: %d\n",
 					reg, ret);
