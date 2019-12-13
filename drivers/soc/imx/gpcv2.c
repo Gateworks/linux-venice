@@ -15,7 +15,7 @@
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <dt-bindings/power/imx7-power.h>
-#include <dt-bindings/power/imx8mq-power.h>
+#include <dt-bindings/power/imx8m-power.h>
 
 #define GPC_LPCR_A_CORE_BSC			0x000
 
