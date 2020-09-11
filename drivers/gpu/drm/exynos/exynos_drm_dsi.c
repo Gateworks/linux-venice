@@ -1735,7 +1735,7 @@ static const struct component_ops exynos_dsi_component_ops = {
 	.unbind	= exynos_dsi_unbind,
 };
 
-static int exynos_dsi_probe(struct platform_device *pdev)
+static struct exynos_dsi *__exynos_dsi_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct exynos_dsi *dsi;
@@ -1743,7 +1743,7 @@ static int exynos_dsi_probe(struct platform_device *pdev)
 
 	dsi = devm_kzalloc(dev, sizeof(*dsi), GFP_KERNEL);
 	if (!dsi)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	/* To be checked as invalid one */
 	dsi->te_gpio = -ENOENT;
@@ -1764,13 +1764,13 @@ static int exynos_dsi_probe(struct platform_device *pdev)
 	ret = devm_regulator_bulk_get(dev, ARRAY_SIZE(dsi->supplies),
 				      dsi->supplies);
 	if (ret)
-		return dev_err_probe(dev, ret, "failed to get regulators\n");
+		return ERR_PTR(dev_err_probe(dev, ret, "failed to get regulators\n"));
 
 	dsi->clks = devm_kcalloc(dev,
 			dsi->driver_data->num_clks, sizeof(*dsi->clks),
 			GFP_KERNEL);
 	if (!dsi->clks)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	for (i = 0; i < dsi->driver_data->num_clks; i++) {
 		dsi->clks[i] = devm_clk_get(dev, clk_names[i]);
@@ -1784,23 +1784,23 @@ static int exynos_dsi_probe(struct platform_device *pdev)
 
 			dev_info(dev, "failed to get the clock: %s\n",
 					clk_names[i]);
-			return PTR_ERR(dsi->clks[i]);
+			return ERR_PTR(PTR_ERR(dsi->clks[i]));
 		}
 	}
 
 	dsi->reg_base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(dsi->reg_base))
-		return PTR_ERR(dsi->reg_base);
+		return dsi->reg_base;
 
 	dsi->phy = devm_phy_get(dev, "dsim");
 	if (IS_ERR(dsi->phy)) {
 		dev_info(dev, "failed to get dsim phy\n");
-		return PTR_ERR(dsi->phy);
+		return ERR_PTR(PTR_ERR(dsi->phy));
 	}
 
 	dsi->irq = platform_get_irq(pdev, 0);
 	if (dsi->irq < 0)
-		return dsi->irq;
+		return ERR_PTR(dsi->irq);
 
 	ret = devm_request_threaded_irq(dev, dsi->irq, NULL,
 					exynos_dsi_irq,
@@ -1808,13 +1808,29 @@ static int exynos_dsi_probe(struct platform_device *pdev)
 					dev_name(dev), dsi);
 	if (ret) {
 		dev_err(dev, "failed to request dsi irq\n");
-		return ret;
+		return ERR_PTR(ret);
 	}
 
 	ret = exynos_dsi_parse_dt(dsi);
 	if (ret)
-		return ret;
+		return ERR_PTR(ret);
 
+	return dsi;
+}
+
+static void __exynos_dsi_remove(struct exynos_dsi *dsi)
+{
+}
+
+static int exynos_dsi_probe(struct platform_device *pdev)
+{
+	struct exynos_dsi *dsi;
+	struct device *dev = &pdev->dev;
+	int ret;
+
+	dsi = __exynos_dsi_probe(pdev);
+	if (IS_ERR(dsi))
+		return PTR_ERR(dsi);
 	platform_set_drvdata(pdev, dsi);
 
 	pm_runtime_enable(dev);
@@ -1833,7 +1849,11 @@ err_disable_runtime:
 
 static int exynos_dsi_remove(struct platform_device *pdev)
 {
+	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
+
 	pm_runtime_disable(&pdev->dev);
+
+	__exynos_dsi_remove(dsi);
 
 	component_del(&pdev->dev, &exynos_dsi_component_ops);
 
