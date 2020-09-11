@@ -239,6 +239,12 @@ struct exynos_dsi_transfer {
 #define DSIM_STATE_CMD_LPM		BIT(2)
 #define DSIM_STATE_VIDOUT_AVAILABLE	BIT(3)
 
+struct exynos_dsi;
+struct exynos_dsi_host_ops {
+	int (*attach)(struct device *dev, struct mipi_dsi_device *device);
+	int (*detach)(struct device *dev, struct mipi_dsi_device *device);
+};
+
 enum exynos_reg_offset {
 	EXYNOS_REG_OFS,
 	EXYNOS5433_REG_OFS
@@ -254,6 +260,7 @@ struct exynos_dsi_driver_data {
 	unsigned int wait_for_reset;
 	unsigned int num_bits_resol;
 	const unsigned int *reg_values;
+	const struct exynos_dsi_host_ops *host_ops;
 };
 
 struct exynos_dsi {
@@ -467,6 +474,41 @@ static const unsigned int exynos5433_reg_values[] = {
 	[PHYTIMING_HS_TRAIL] = 0x0c,
 };
 
+static int __exynos_dsi_host_attach(struct device *dev,
+				    struct mipi_dsi_device *device)
+{
+	struct exynos_dsi *dsi = dev_get_drvdata(dev);
+	struct drm_device *drm = dsi->encoder.dev;
+	struct exynos_drm_crtc *crtc;
+
+	mutex_lock(&drm->mode_config.mutex);
+	crtc = exynos_drm_crtc_get_by_type(drm, EXYNOS_DISPLAY_TYPE_LCD);
+	crtc->i80_mode = !(device->mode_flags & MIPI_DSI_MODE_VIDEO);
+	mutex_unlock(&drm->mode_config.mutex);
+
+	if (drm->mode_config.poll_enabled)
+		drm_kms_helper_hotplug_event(drm);
+
+	return 0;
+}
+
+static int __exynos_dsi_host_detach(struct device *dev,
+				     struct mipi_dsi_device *device)
+{
+	struct exynos_dsi *dsi = dev_get_drvdata(dev);
+	struct drm_device *drm = dsi->encoder.dev;
+
+	if (drm->mode_config.poll_enabled)
+		drm_kms_helper_hotplug_event(drm);
+
+	return 0;
+}
+
+static const struct exynos_dsi_host_ops exynos_dsi_host_ops = {
+	.attach = __exynos_dsi_host_attach,
+	.detach = __exynos_dsi_host_detach,
+};
+
 static const struct exynos_dsi_driver_data exynos3_dsi_driver_data = {
 	.reg_ofs = EXYNOS_REG_OFS,
 	.plltmr_reg = 0x50,
@@ -477,6 +519,7 @@ static const struct exynos_dsi_driver_data exynos3_dsi_driver_data = {
 	.wait_for_reset = 1,
 	.num_bits_resol = 11,
 	.reg_values = reg_values,
+	.host_ops = &exynos_dsi_host_ops,
 };
 
 static const struct exynos_dsi_driver_data exynos4_dsi_driver_data = {
@@ -489,6 +532,7 @@ static const struct exynos_dsi_driver_data exynos4_dsi_driver_data = {
 	.wait_for_reset = 1,
 	.num_bits_resol = 11,
 	.reg_values = reg_values,
+	.host_ops = &exynos_dsi_host_ops,
 };
 
 static const struct exynos_dsi_driver_data exynos5_dsi_driver_data = {
@@ -499,6 +543,7 @@ static const struct exynos_dsi_driver_data exynos5_dsi_driver_data = {
 	.wait_for_reset = 1,
 	.num_bits_resol = 11,
 	.reg_values = reg_values,
+	.host_ops = &exynos_dsi_host_ops,
 };
 
 static const struct exynos_dsi_driver_data exynos5433_dsi_driver_data = {
@@ -510,6 +555,7 @@ static const struct exynos_dsi_driver_data exynos5433_dsi_driver_data = {
 	.wait_for_reset = 0,
 	.num_bits_resol = 12,
 	.reg_values = exynos5433_reg_values,
+	.host_ops = &exynos_dsi_host_ops,
 };
 
 static const struct exynos_dsi_driver_data exynos5422_dsi_driver_data = {
@@ -521,6 +567,7 @@ static const struct exynos_dsi_driver_data exynos5422_dsi_driver_data = {
 	.wait_for_reset = 1,
 	.num_bits_resol = 12,
 	.reg_values = exynos5422_reg_values,
+	.host_ops = &exynos_dsi_host_ops,
 };
 
 static const struct of_device_id exynos_dsi_of_match[] = {
@@ -1555,8 +1602,8 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 				  struct mipi_dsi_device *device)
 {
 	struct exynos_dsi *dsi = host_to_dsi(host);
+	const struct exynos_dsi_host_ops *ops = dsi->driver_data->host_ops;
 	struct drm_encoder *encoder = &dsi->encoder;
-	struct drm_device *drm = encoder->dev;
 	struct drm_bridge *out_bridge;
 
 	out_bridge  = of_drm_find_bridge(device->dev.of_node);
@@ -1594,18 +1641,12 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 			return ret;
 	}
 
-	mutex_lock(&drm->mode_config.mutex);
-
 	dsi->lanes = device->lanes;
 	dsi->format = device->format;
 	dsi->mode_flags = device->mode_flags;
-	exynos_drm_crtc_get_by_type(drm, EXYNOS_DISPLAY_TYPE_LCD)->i80_mode =
-			!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO);
 
-	mutex_unlock(&drm->mode_config.mutex);
-
-	if (drm->mode_config.poll_enabled)
-		drm_kms_helper_hotplug_event(drm);
+	if (ops && ops->attach)
+		ops->attach(dsi->dsi_host.dev, device);
 
 	return 0;
 }
@@ -1614,6 +1655,7 @@ static int exynos_dsi_host_detach(struct mipi_dsi_host *host,
 				  struct mipi_dsi_device *device)
 {
 	struct exynos_dsi *dsi = host_to_dsi(host);
+	const struct exynos_dsi_host_ops *ops = dsi->driver_data->host_ops;
 	struct drm_device *drm = dsi->encoder.dev;
 
 	if (dsi->panel) {
@@ -1629,8 +1671,8 @@ static int exynos_dsi_host_detach(struct mipi_dsi_host *host,
 		INIT_LIST_HEAD(&dsi->bridge_chain);
 	}
 
-	if (drm->mode_config.poll_enabled)
-		drm_kms_helper_hotplug_event(drm);
+	if (ops && ops->detach)
+		ops->detach(dsi->dsi_host.dev, device);
 
 	exynos_dsi_unregister_te_irq(dsi);
 
