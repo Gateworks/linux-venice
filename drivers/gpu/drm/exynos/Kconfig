@@ -17,7 +17,6 @@ comment "CRTCs"
 
 config DRM_EXYNOS_FIMD
 	bool "FIMD"
-	depends on !FB_S3C
 	select MFD_SYSCON
 	help
 	  Choose this option if you want to use Exynos FIMD for DRM.
@@ -29,7 +28,6 @@ config DRM_EXYNOS5433_DECON
 
 config DRM_EXYNOS7_DECON
 	bool "DECON on Exynos7"
-	depends on !FB_S3C
 	help
 	  Choose this option if you want to use Exynos DECON for DRM.
 
@@ -56,8 +54,7 @@ config DRM_EXYNOS_DPI
 config DRM_EXYNOS_DSI
 	bool "MIPI-DSI host"
 	depends on DRM_EXYNOS_FIMD || DRM_EXYNOS5433_DECON || DRM_EXYNOS7_DECON
-	select DRM_MIPI_DSI
-	select DRM_PANEL
+	select DRM_SAMSUNG_DSIM
 	default n
 	help
 	  This enables support for Exynos MIPI-DSI device.
