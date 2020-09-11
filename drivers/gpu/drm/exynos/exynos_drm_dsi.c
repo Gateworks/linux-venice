@@ -266,6 +266,7 @@ struct exynos_dsi_driver_data {
 
 struct exynos_dsi {
 	struct drm_encoder encoder;
+	struct drm_bridge bridge;
 	struct mipi_dsi_host dsi_host;
 	struct drm_connector connector;
 	struct drm_panel *panel;
@@ -1606,6 +1607,60 @@ static const struct drm_encoder_helper_funcs exynos_dsi_encoder_helper_funcs = {
 	.disable = exynos_dsi_disable,
 };
 
+static int exynos_dsi_bridge_attach(struct drm_bridge *bridge,
+				    enum drm_bridge_attach_flags flags)
+{
+	struct exynos_dsi *dsi = bridge->driver_private;
+	struct drm_encoder *encoder = bridge->encoder;
+	int ret;
+
+	if (!dsi->out_bridge && !dsi->panel)
+		return -EPROBE_DEFER;
+
+	if (dsi->out_bridge) {
+		ret = drm_bridge_attach(encoder, dsi->out_bridge,
+					bridge, flags);
+		if (ret)
+			return ret;
+		list_splice_init(&encoder->bridge_chain, &dsi->bridge_chain);
+	} else {
+		ret = exynos_dsi_create_connector(encoder);
+		if (ret)
+			return ret;
+
+		if (dsi->panel) {
+			dsi->connector.status = connector_status_connected;
+		}
+	}
+
+	return 0;
+}
+
+static void exynos_dsi_bridge_detach(struct drm_bridge *bridge)
+{
+	struct exynos_dsi *dsi = bridge->driver_private;
+	struct drm_encoder *encoder = bridge->encoder;
+	struct drm_device *drm = encoder->dev;
+
+	if (dsi->panel) {
+		mutex_lock(&drm->mode_config.mutex);
+		exynos_dsi_disable(&dsi->encoder);
+		dsi->panel = NULL;
+		dsi->connector.status = connector_status_disconnected;
+		mutex_unlock(&drm->mode_config.mutex);
+	} else {
+		if (dsi->out_bridge->funcs->detach)
+			dsi->out_bridge->funcs->detach(dsi->out_bridge);
+		dsi->out_bridge = NULL;
+		INIT_LIST_HEAD(&dsi->bridge_chain);
+	}
+}
+
+static const struct drm_bridge_funcs exynos_dsi_bridge_funcs = {
+	.attach = exynos_dsi_bridge_attach,
+	.detach = exynos_dsi_bridge_detach,
+};
+
 MODULE_DEVICE_TABLE(of, exynos_dsi_of_match);
 
 static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
@@ -1613,25 +1668,12 @@ static int exynos_dsi_host_attach(struct mipi_dsi_host *host,
 {
 	struct exynos_dsi *dsi = host_to_dsi(host);
 	const struct exynos_dsi_host_ops *ops = dsi->driver_data->host_ops;
-	struct drm_encoder *encoder = &dsi->encoder;
 	struct drm_bridge *out_bridge;
 
-	out_bridge  = of_drm_find_bridge(device->dev.of_node);
+	out_bridge = of_drm_find_bridge(device->dev.of_node);
 	if (out_bridge) {
-		drm_bridge_attach(encoder, out_bridge, NULL, 0);
 		dsi->out_bridge = out_bridge;
-		list_splice_init(&encoder->bridge_chain, &dsi->bridge_chain);
 	} else {
-		int ret = exynos_dsi_create_connector(encoder);
-
-		if (ret) {
-			DRM_DEV_ERROR(dsi->dev,
-				      "failed to create connector ret = %d\n",
-				      ret);
-			drm_encoder_cleanup(encoder);
-			return ret;
-		}
-
 		dsi->panel = of_drm_find_panel(device->dev.of_node);
 		if (IS_ERR(dsi->panel))
 			dsi->panel = NULL;
@@ -1666,20 +1708,6 @@ static int exynos_dsi_host_detach(struct mipi_dsi_host *host,
 {
 	struct exynos_dsi *dsi = host_to_dsi(host);
 	const struct exynos_dsi_host_ops *ops = dsi->driver_data->host_ops;
-	struct drm_device *drm = dsi->encoder.dev;
-
-	if (dsi->panel) {
-		mutex_lock(&drm->mode_config.mutex);
-		exynos_dsi_disable(&dsi->encoder);
-		dsi->panel = NULL;
-		dsi->connector.status = connector_status_disconnected;
-		mutex_unlock(&drm->mode_config.mutex);
-	} else {
-		if (dsi->out_bridge->funcs->detach)
-			dsi->out_bridge->funcs->detach(dsi->out_bridge);
-		dsi->out_bridge = NULL;
-		INIT_LIST_HEAD(&dsi->bridge_chain);
-	}
 
 	if (ops && ops->detach)
 		ops->detach(dsi->dsi_host.dev, device);
@@ -1790,7 +1818,15 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
 		of_node_put(in_bridge_node);
 	}
 
+	ret = drm_bridge_attach(encoder, &dsi->bridge, in_bridge, 0);
+	if (ret)
+		goto err;
+
 	return 0;
+
+err:
+	drm_encoder_cleanup(encoder);
+	return ret;
 }
 
 static void exynos_dsi_unbind(struct device *dev, struct device *master,
@@ -1800,6 +1836,8 @@ static void exynos_dsi_unbind(struct device *dev, struct device *master,
 	struct drm_encoder *encoder = &dsi->encoder;
 
 	exynos_dsi_disable(encoder);
+
+	drm_encoder_cleanup(encoder);
 }
 
 static const struct component_ops exynos_dsi_component_ops = {
@@ -1810,6 +1848,7 @@ static const struct component_ops exynos_dsi_component_ops = {
 static struct exynos_dsi *__exynos_dsi_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct drm_bridge *bridge;
 	struct exynos_dsi *dsi;
 	int ret, i;
 
@@ -1891,11 +1930,19 @@ static struct exynos_dsi *__exynos_dsi_probe(struct platform_device *pdev)
 	if (ret)
 		return ERR_PTR(ret);
 
+	bridge = &dsi->bridge;
+	bridge->driver_private = dsi;
+	bridge->funcs = &exynos_dsi_bridge_funcs;
+	bridge->of_node = dev->of_node;
+	drm_bridge_add(bridge);
+
 	return dsi;
 }
 
 static void __exynos_dsi_remove(struct exynos_dsi *dsi)
 {
+	drm_bridge_remove(&dsi->bridge);
+
 	mipi_dsi_host_unregister(&dsi->dsi_host);
 }
 
