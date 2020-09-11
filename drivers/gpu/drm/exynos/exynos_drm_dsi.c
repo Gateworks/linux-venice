@@ -303,11 +303,6 @@ struct exynos_dsi {
 #define host_to_dsi(host) container_of(host, struct exynos_dsi, dsi_host)
 #define connector_to_dsi(c) container_of(c, struct exynos_dsi, connector)
 
-static inline struct exynos_dsi *encoder_to_dsi(struct drm_encoder *e)
-{
-	return container_of(e, struct exynos_dsi, encoder);
-}
-
 enum reg_idx {
 	DSIM_STATUS_REG,	/* Status register */
 	DSIM_SWRST_REG,		/* Software reset register */
@@ -1574,11 +1569,10 @@ static const struct drm_connector_helper_funcs exynos_dsi_connector_helper_funcs
 	.get_modes = exynos_dsi_get_modes,
 };
 
-static int exynos_dsi_create_connector(struct drm_encoder *encoder)
+static int exynos_dsi_create_connector(struct exynos_dsi *dsi)
 {
-	struct exynos_dsi *dsi = encoder_to_dsi(encoder);
 	struct drm_connector *connector = &dsi->connector;
-	struct drm_device *drm = encoder->dev;
+	struct drm_device *drm = dsi->bridge.dev;
 	int ret;
 
 	connector->polled = DRM_CONNECTOR_POLL_HPD;
@@ -1593,7 +1587,7 @@ static int exynos_dsi_create_connector(struct drm_encoder *encoder)
 
 	connector->status = connector_status_disconnected;
 	drm_connector_helper_add(connector, &exynos_dsi_connector_helper_funcs);
-	drm_connector_attach_encoder(connector, encoder);
+	drm_connector_attach_encoder(connector, dsi->bridge.encoder);
 	if (!drm->registered)
 		return 0;
 
@@ -1619,7 +1613,7 @@ static int exynos_dsi_bridge_attach(struct drm_bridge *bridge,
 			return ret;
 		list_splice_init(&encoder->bridge_chain, &dsi->bridge_chain);
 	} else {
-		ret = exynos_dsi_create_connector(encoder);
+		ret = exynos_dsi_create_connector(dsi);
 		if (ret)
 			return ret;
 
