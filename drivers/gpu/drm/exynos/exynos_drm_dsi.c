@@ -265,7 +265,6 @@ struct exynos_dsi_driver_data {
 };
 
 struct exynos_dsi {
-	struct drm_encoder encoder;
 	struct drm_bridge bridge;
 	struct mipi_dsi_host dsi_host;
 	struct drm_connector connector;
@@ -419,6 +418,11 @@ enum reg_value_idx {
 	PHYTIMING_HS_TRAIL
 };
 
+struct exynos_dsi_pltfm {
+	struct exynos_dsi *dsi;
+	struct drm_encoder encoder;
+};
+
 static const unsigned int reg_values[] = {
 	[RESET_TYPE] = DSIM_SWRST,
 	[PLL_TIMER] = 500,
@@ -476,7 +480,7 @@ static const unsigned int exynos5433_reg_values[] = {
 static int __exynos_dsi_host_attach(struct device *dev,
 				    struct mipi_dsi_device *device)
 {
-	struct exynos_dsi *dsi = dev_get_drvdata(dev);
+	struct exynos_dsi_pltfm *dsi = dev_get_drvdata(dev);
 	struct drm_device *drm = dsi->encoder.dev;
 	struct exynos_drm_crtc *crtc;
 
@@ -494,7 +498,7 @@ static int __exynos_dsi_host_attach(struct device *dev,
 static int __exynos_dsi_host_detach(struct device *dev,
 				     struct mipi_dsi_device *device)
 {
-	struct exynos_dsi *dsi = dev_get_drvdata(dev);
+	struct exynos_dsi_pltfm *dsi = dev_get_drvdata(dev);
 	struct drm_device *drm = dsi->encoder.dev;
 
 	if (drm->mode_config.poll_enabled)
@@ -505,7 +509,7 @@ static int __exynos_dsi_host_detach(struct device *dev,
 
 static void __exynos_dsi_te_handler(struct device *dev)
 {
-	struct exynos_dsi *dsi = dev_get_drvdata(dev);
+	struct exynos_dsi_pltfm *dsi = dev_get_drvdata(dev);
 
 	exynos_drm_crtc_te_handler(dsi->encoder.crtc);
 }
@@ -1808,10 +1812,12 @@ static int exynos_dsi_parse_dt(struct exynos_dsi *dsi)
 	return 0;
 }
 
-static int exynos_dsi_bind(struct device *dev, struct device *master,
-				void *data)
+static int exynos_dsi_bind(struct exynos_dsi *dsi, struct drm_encoder *encoder);
+static void exynos_dsi_unbind(struct exynos_dsi *dsi);
+
+static int exynos_dsi_pltfm_bind(struct device *dev, struct device *master, void *data)
 {
-	struct exynos_dsi *dsi = dev_get_drvdata(dev);
+	struct exynos_dsi_pltfm *dsi = dev_get_drvdata(dev);
 	struct drm_encoder *encoder = &dsi->encoder;
 	struct drm_device *drm_dev = data;
 	struct device_node *in_bridge_node;
@@ -1832,7 +1838,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
 		of_node_put(in_bridge_node);
 	}
 
-	ret = drm_bridge_attach(encoder, &dsi->bridge, in_bridge, 0);
+	ret = exynos_dsi_bind(dsi->dsi, encoder);
 	if (ret)
 		goto err;
 
@@ -1843,20 +1849,20 @@ err:
 	return ret;
 }
 
-static void exynos_dsi_unbind(struct device *dev, struct device *master,
-				void *data)
+static void exynos_dsi_pltfm_unbind(struct device *dev, struct device *master,
+				    void *data)
 {
-	struct exynos_dsi *dsi = dev_get_drvdata(dev);
+	struct exynos_dsi_pltfm *dsi = dev_get_drvdata(dev);
 	struct drm_encoder *encoder = &dsi->encoder;
 
-	exynos_dsi_disable(dsi);
+	exynos_dsi_unbind(dsi->dsi);
 
 	drm_encoder_cleanup(encoder);
 }
 
-static const struct component_ops exynos_dsi_component_ops = {
-	.bind	= exynos_dsi_bind,
-	.unbind	= exynos_dsi_unbind,
+static const struct component_ops exynos_dsi_pltfm_component_ops = {
+	.bind	= exynos_dsi_pltfm_bind,
+	.unbind	= exynos_dsi_pltfm_unbind,
 };
 
 static struct exynos_dsi *__exynos_dsi_probe(struct platform_device *pdev)
@@ -1960,20 +1966,52 @@ static void __exynos_dsi_remove(struct exynos_dsi *dsi)
 	mipi_dsi_host_unregister(&dsi->dsi_host);
 }
 
-static int exynos_dsi_probe(struct platform_device *pdev)
+/*
+ * Probe/remove API, used from platforms based on the DRM bridge API.
+ */
+static struct exynos_dsi *exynos_dsi_probe(struct platform_device *pdev)
 {
-	struct exynos_dsi *dsi;
+	return __exynos_dsi_probe(pdev);
+}
+
+static void exynos_dsi_remove(struct exynos_dsi *dsi)
+{
+	return __exynos_dsi_remove(dsi);
+}
+
+/*
+ * Bind/unbind API, used from platforms based on the component framework.
+ */
+static int exynos_dsi_bind(struct exynos_dsi *dsi, struct drm_encoder *encoder)
+{
+	struct drm_bridge *previous = drm_bridge_chain_get_first_bridge(encoder);
+
+	return drm_bridge_attach(encoder, &dsi->bridge, previous, 0);
+}
+
+static void exynos_dsi_unbind(struct exynos_dsi *dsi)
+{
+	exynos_dsi_disable(dsi);
+}
+
+static int exynos_dsi_pltfm_probe(struct platform_device *pdev)
+{
+	struct exynos_dsi_pltfm *dsi;
 	struct device *dev = &pdev->dev;
 	int ret;
 
-	dsi = __exynos_dsi_probe(pdev);
-	if (IS_ERR(dsi))
-		return PTR_ERR(dsi);
+	dsi = devm_kzalloc(dev, sizeof(*dsi), GFP_KERNEL);
+	if (!dsi)
+		return -ENOMEM;
 	platform_set_drvdata(pdev, dsi);
+
+	dsi->dsi = exynos_dsi_probe(pdev);
+	if (IS_ERR(dsi->dsi))
+		return PTR_ERR(dsi->dsi);
 
 	pm_runtime_enable(dev);
 
-	ret = component_add(dev, &exynos_dsi_component_ops);
+	ret = component_add(dev, &exynos_dsi_pltfm_component_ops);
 	if (ret)
 		goto err_disable_runtime;
 
@@ -1985,22 +2023,21 @@ err_disable_runtime:
 	return ret;
 }
 
-static int exynos_dsi_remove(struct platform_device *pdev)
+static int exynos_dsi_pltfm_remove(struct platform_device *pdev)
 {
-	struct exynos_dsi *dsi = platform_get_drvdata(pdev);
+	struct exynos_dsi_pltfm *dsi = platform_get_drvdata(pdev);
 
 	pm_runtime_disable(&pdev->dev);
 
-	__exynos_dsi_remove(dsi);
+	exynos_dsi_remove(dsi->dsi);
 
-	component_del(&pdev->dev, &exynos_dsi_component_ops);
+	component_del(&pdev->dev, &exynos_dsi_pltfm_component_ops);
 
 	return 0;
 }
 
-static int __maybe_unused exynos_dsi_suspend(struct device *dev)
+static int exynos_dsi_suspend(struct exynos_dsi *dsi)
 {
-	struct exynos_dsi *dsi = dev_get_drvdata(dev);
 	const struct exynos_dsi_driver_data *driver_data = dsi->driver_data;
 	int ret, i;
 
@@ -2028,9 +2065,8 @@ static int __maybe_unused exynos_dsi_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused exynos_dsi_resume(struct device *dev)
+static int exynos_dsi_resume(struct exynos_dsi *dsi)
 {
-	struct exynos_dsi *dsi = dev_get_drvdata(dev);
 	const struct exynos_dsi_driver_data *driver_data = dsi->driver_data;
 	int ret, i;
 
@@ -2062,15 +2098,29 @@ err_clk:
 	return ret;
 }
 
+static int __maybe_unused exynos_dsi_pltfm_suspend(struct device *dev)
+{
+	struct exynos_dsi_pltfm *dsi = dev_get_drvdata(dev);
+
+	return exynos_dsi_suspend(dsi->dsi);
+}
+
+static int __maybe_unused exynos_dsi_pltfm_resume(struct device *dev)
+{
+	struct exynos_dsi_pltfm *dsi = dev_get_drvdata(dev);
+
+	return exynos_dsi_resume(dsi->dsi);
+}
+
 static const struct dev_pm_ops exynos_dsi_pm_ops = {
-	SET_RUNTIME_PM_OPS(exynos_dsi_suspend, exynos_dsi_resume, NULL)
+	SET_RUNTIME_PM_OPS(exynos_dsi_pltfm_suspend, exynos_dsi_pltfm_resume, NULL)
 	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
 				pm_runtime_force_resume)
 };
 
 struct platform_driver dsi_driver = {
-	.probe = exynos_dsi_probe,
-	.remove = exynos_dsi_remove,
+	.probe = exynos_dsi_pltfm_probe,
+	.remove = exynos_dsi_pltfm_remove,
 	.driver = {
 		   .name = "exynos-dsi",
 		   .owner = THIS_MODULE,
