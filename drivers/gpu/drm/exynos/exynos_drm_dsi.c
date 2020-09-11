@@ -243,6 +243,7 @@ struct exynos_dsi;
 struct exynos_dsi_host_ops {
 	int (*attach)(struct device *dev, struct mipi_dsi_device *device);
 	int (*detach)(struct device *dev, struct mipi_dsi_device *device);
+	void (*te_handler)(struct device *dev);
 };
 
 enum exynos_reg_offset {
@@ -504,9 +505,17 @@ static int __exynos_dsi_host_detach(struct device *dev,
 	return 0;
 }
 
+static void __exynos_dsi_te_handler(struct device *dev)
+{
+	struct exynos_dsi *dsi = dev_get_drvdata(dev);
+
+	exynos_drm_crtc_te_handler(dsi->encoder.crtc);
+}
+
 static const struct exynos_dsi_host_ops exynos_dsi_host_ops = {
 	.attach = __exynos_dsi_host_attach,
 	.detach = __exynos_dsi_host_detach,
+	.te_handler = __exynos_dsi_te_handler,
 };
 
 static const struct exynos_dsi_driver_data exynos3_dsi_driver_data = {
@@ -1354,11 +1363,12 @@ static irqreturn_t exynos_dsi_irq(int irq, void *dev_id)
 
 static irqreturn_t exynos_dsi_te_irq_handler(int irq, void *dev_id)
 {
-	struct exynos_dsi *dsi = (struct exynos_dsi *)dev_id;
-	struct drm_encoder *encoder = &dsi->encoder;
+	struct exynos_dsi *dsi = dev_id;
+	const struct exynos_dsi_host_ops *ops = dsi->driver_data->host_ops;
 
-	if (dsi->state & DSIM_STATE_VIDOUT_AVAILABLE)
-		exynos_drm_crtc_te_handler(encoder->crtc);
+	if (ops && ops->te_handler &&
+	    (dsi->state & DSIM_STATE_VIDOUT_AVAILABLE))
+		ops->te_handler(dsi->dsi_host.dev);
 
 	return IRQ_HANDLED;
 }
