@@ -288,6 +288,8 @@ struct exynos_dsi {
 	u32 mode_flags;
 	u32 format;
 
+	struct drm_display_mode mode;
+
 	int state;
 	struct drm_property *brightness;
 	struct completion completed;
@@ -961,7 +963,7 @@ static int exynos_dsi_init_link(struct exynos_dsi *dsi)
 
 static void exynos_dsi_set_display_mode(struct exynos_dsi *dsi)
 {
-	struct drm_display_mode *m = &dsi->encoder.crtc->state->adjusted_mode;
+	struct drm_display_mode *m = &dsi->mode;
 	unsigned int num_bits_resol = dsi->driver_data->num_bits_resol;
 	u32 reg;
 
@@ -1663,11 +1665,22 @@ static void exynos_dsi_bridge_disable(struct drm_bridge *bridge)
 	exynos_dsi_disable(dsi);
 }
 
+static void exynos_dsi_bridge_mode_set(struct drm_bridge *bridge,
+				       const struct drm_display_mode *mode,
+				       const struct drm_display_mode *adjusted_mode)
+{
+	struct exynos_dsi *dsi = bridge->driver_private;
+
+	/* The mode is set when actually enabling the device. */
+	drm_mode_copy(&dsi->mode, adjusted_mode);
+}
+
 static const struct drm_bridge_funcs exynos_dsi_bridge_funcs = {
 	.attach = exynos_dsi_bridge_attach,
 	.detach = exynos_dsi_bridge_detach,
 	.enable = exynos_dsi_bridge_enable,
 	.disable = exynos_dsi_bridge_disable,
+	.mode_set = exynos_dsi_bridge_mode_set,
 };
 
 MODULE_DEVICE_TABLE(of, exynos_dsi_of_match);
