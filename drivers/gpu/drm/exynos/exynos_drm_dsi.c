@@ -1716,7 +1716,7 @@ static int exynos_dsi_bind(struct device *dev, struct device *master,
 		of_node_put(in_bridge_node);
 	}
 
-	return mipi_dsi_host_register(&dsi->dsi_host);
+	return 0;
 }
 
 static void exynos_dsi_unbind(struct device *dev, struct device *master,
@@ -1726,8 +1726,6 @@ static void exynos_dsi_unbind(struct device *dev, struct device *master,
 	struct drm_encoder *encoder = &dsi->encoder;
 
 	exynos_dsi_disable(encoder);
-
-	mipi_dsi_host_unregister(&dsi->dsi_host);
 }
 
 static const struct component_ops exynos_dsi_component_ops = {
@@ -1815,11 +1813,16 @@ static struct exynos_dsi *__exynos_dsi_probe(struct platform_device *pdev)
 	if (ret)
 		return ERR_PTR(ret);
 
+	ret = mipi_dsi_host_register(&dsi->dsi_host);
+	if (ret)
+		return ERR_PTR(ret);
+
 	return dsi;
 }
 
 static void __exynos_dsi_remove(struct exynos_dsi *dsi)
 {
+	mipi_dsi_host_unregister(&dsi->dsi_host);
 }
 
 static int exynos_dsi_probe(struct platform_device *pdev)
