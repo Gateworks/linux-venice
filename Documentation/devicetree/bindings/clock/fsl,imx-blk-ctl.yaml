@@ -20,6 +20,7 @@ properties:
   compatible:
     items:
       - enum:
+         - fsl,imx8mm-dispmix-blk-ctl
          - fsl,imx8mp-audio-blk-ctl
          - fsl,imx8mp-hdmi-blk-ctl
          - fsl,imx8mp-media-blk-ctl
