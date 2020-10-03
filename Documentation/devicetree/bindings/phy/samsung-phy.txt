@@ -1,14 +1,15 @@
-Samsung S5P/Exynos SoC series MIPI CSIS/DSIM DPHY
--------------------------------------------------
+Samsung S5P/Exynos and NXP i.MX8MM SoC series MIPI CSIS/DSIM DPHY
+-----------------------------------------------------------------
 
 Required properties:
 - compatible : should be one of the listed compatibles:
 	- "samsung,s5pv210-mipi-video-phy"
 	- "samsung,exynos5420-mipi-video-phy"
 	- "samsung,exynos5433-mipi-video-phy"
+	- "fsl,imx8mm-mipi-video-phy"
 - #phy-cells : from the generic phy bindings, must be 1;
 
-In case of s5pv210 and exynos5420 compatible PHYs:
+In case of s5pv210, exynos5420, imx8mm compatible PHYs:
 - syscon - phandle to the PMU system controller
 
 In case of exynos5433 compatible PHY:
