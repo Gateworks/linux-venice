@@ -1244,6 +1244,13 @@ static void samsung_dsim_enable(struct samsung_dsim *dsi)
 	pm_runtime_get_sync(dsi->dev);
 	dsi->state |= DSIM_STATE_ENABLED;
 
+	if (!(dsi->state & DSIM_STATE_INITIALIZED)) {
+		ret = samsung_dsim_init(dsi);
+		if (ret)
+			return;
+		dsi->state |= DSIM_STATE_INITIALIZED;
+	}
+
 	if (dsi->panel) {
 		ret = drm_panel_prepare(dsi->panel);
 		if (ret < 0)
