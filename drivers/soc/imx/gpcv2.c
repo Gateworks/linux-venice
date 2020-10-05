@@ -9,6 +9,7 @@
  */
 
 #include <linux/clk.h>
+#include <linux/clk-provider.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/pm_domain.h>
@@ -20,6 +21,9 @@
 #include <dt-bindings/power/imx7-power.h>
 #include <dt-bindings/power/imx8mq-power.h>
 #include <dt-bindings/power/imx8mm-power.h>
+
+#include <linux/regmap.h>
+#include <linux/mfd/syscon.h>
 
 #define GPC_LPCR_A_CORE_BSC			0x000
 
@@ -164,6 +168,7 @@ struct imx_pgc_domain {
 	struct reset_control *reset;
 	struct clk_bulk_data *clks;
 	int num_clks;
+	struct regmap *syscon;
 
 	unsigned int pgc;
 
@@ -194,7 +199,7 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 {
 	struct imx_pgc_domain *domain = to_imx_pgc_domain(genpd);
 	u32 reg_val;
-	int ret;
+	int ret, i;
 
 	ret = pm_runtime_get_sync(domain->dev);
 	if (ret) {
@@ -246,6 +251,12 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 
 	reset_control_deassert(domain->reset);
 
+	if (domain->syscon) {
+		regmap_write(domain->syscon, 0x4, 0x1fff);
+		regmap_write(domain->syscon, 0x0, 0x7f);
+		regmap_write(domain->syscon, 0x8, 0x30000);
+	}
+
 	/* request the ADB400 to power up */
 	if (domain->bits.hskreq) {
 		regmap_update_bits(domain->regmap, GPC_PU_PWRHSK,
@@ -262,7 +273,13 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 	}
 
 	/* Disable reset clocks for all devices in the domain */
-	clk_bulk_disable_unprepare(domain->num_clks, domain->clks);
+	for (i = 0; i < domain->num_clks; i++) {
+		/* Keep the DISPMIX active, it is needed by both LCDIF and MIPI */
+		if (strcmp(__clk_get_name(domain->clks[i].clk), "disp_root_clk") &&
+		    strcmp(__clk_get_name(domain->clks[i].clk), "disp_axi_root_clk") &&
+		    strcmp(__clk_get_name(domain->clks[i].clk), "disp_apb_root_clk"))
+			clk_disable_unprepare(domain->clks[i].clk);
+	}
 
 	return 0;
 
@@ -777,7 +794,6 @@ static int imx_pgc_domain_probe(struct platform_device *pdev)
 				      domain->voltage, domain->voltage);
 	}
 
-
 	domain->num_clks = devm_clk_bulk_get_all(domain->dev, &domain->clks);
 	if (domain->num_clks < 0)
 		return dev_err_probe(domain->dev, domain->num_clks,
@@ -787,6 +803,9 @@ static int imx_pgc_domain_probe(struct platform_device *pdev)
 	if (IS_ERR(domain->reset))
 		return dev_err_probe(domain->dev, PTR_ERR(domain->reset),
 				     "Failed to get domain's resets\n");
+	domain->syscon = syscon_regmap_lookup_by_phandle(domain->dev->of_node, "syscon");
+	if (IS_ERR(domain->syscon))
+		domain->syscon = NULL;
 
 	pm_runtime_enable(domain->dev);
 
