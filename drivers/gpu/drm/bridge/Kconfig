@@ -199,6 +199,12 @@ config DRM_SAMSUNG_DSIM
 	help
 	  Samsung MIPI DSI bridge driver.
 
+config DRM_SAMSUNG_DSIM_IMX
+	tristate "Samsung MIPI DSI bridge extras for NXP i.MX"
+	depends on DRM_SAMSUNG_DSIM
+	help
+	  Samsung MIPI DSI bridge driver extras for NXP i.MX.
+
 config DRM_SIL_SII8620
 	tristate "Silicon Image SII8620 HDMI/MHL bridge"
 	depends on OF
