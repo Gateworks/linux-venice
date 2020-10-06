@@ -615,6 +615,21 @@
 						resets = <&src IMX8MQ_RESET_GPU_RESET>;
 						power-domains = <&pgc_gpumix>;
 					};
+
+					dispmix_pd: power-domain@10 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_DISPMIX>;
+						syscon = <&dispmix_blk_ctl>;
+						clocks = <&clk IMX8MM_CLK_DISP_ROOT>,
+							 <&clk IMX8MM_CLK_DISP_AXI_ROOT>,
+							 <&clk IMX8MM_CLK_DISP_APB_ROOT>;
+					};
+
+					mipi_pd: power-domain@11 {
+						#power-domain-cells = <0>;
+						reg = <IMX8MM_POWER_DOMAIN_MIPI>;
+						power-domains = <&dispmix_pd>;
+					};
 				};
 			};
 		};
