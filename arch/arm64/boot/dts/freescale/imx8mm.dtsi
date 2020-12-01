@@ -265,11 +265,6 @@
 		clock-names = "main_clk";
 	};
 
-	display-subsystem {
-		compatible = "fsl,imx-display-subsystem";
-		ports = <&lcdif_disp0>;
-	};
-
 	soc@0 {
 		compatible = "simple-bus";
 		#address-cells = <1>;
@@ -973,7 +968,7 @@
 			lcdif: lcdif@32e00000 {
 				#address-cells = <1>;
 				#size-cells = <0>;
-				compatible = "fsl,imx8mm-lcdif", "fsl,imx28-lcdif";
+				compatible = "fsl,imx8mm-lcdif", "fsl,imx6sx-lcdif";
 				reg = <0x32e00000 0x10000>;
 				clocks = <&dispmix_blk_ctl IMX8MM_CLK_MEDIA_BLK_CTL_LCDIF_PIXEL>,
 					 <&clk IMX8MM_CLK_DISP_AXI_ROOT>,
@@ -990,7 +985,7 @@
 				power-domains = <&dispmix_pd>;
 				status = "disabled";
 
-				lcdif_disp0: port@0 {
+				port@0 {
 					reg = <0>;
 
 					lcdif_to_dsim: endpoint {
@@ -1025,6 +1020,8 @@
 				samsung,pll-clock-frequency = <54000000>;
 
 				port@0 {
+					reg = <0>;
+
 					dsim_from_lcdif: endpoint {
 						remote-endpoint = <&lcdif_to_dsim>;
 					};
