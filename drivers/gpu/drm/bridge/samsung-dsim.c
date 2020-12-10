@@ -204,6 +204,7 @@
 #define DSI_RX_FIFO_SIZE		256
 #define DSI_XFER_TIMEOUT_MS		100
 #define DSI_RX_FIFO_EMPTY		0x30800002
+#define DSI_HSYNC_PKT_OVERHEAD	6
 
 #define OLD_SCLK_MIPI_CLK_NAME "pll_clk"
 
@@ -742,7 +743,7 @@ static void samsung_dsim_set_display_mode(struct samsung_dsim *dsi)
 	struct drm_display_mode *m = &dsi->mode;
 	unsigned int num_bits_resol = dsi->driver_data->num_bits_resol;
 	int bpp;
-	u32 reg;
+	u32 reg, hfp, hbp, hsa;
 
 	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO) {
 		bpp = mipi_dsi_pixel_format_to_bpp(dsi->format) / 8;
@@ -752,12 +753,20 @@ static void samsung_dsim_set_display_mode(struct samsung_dsim *dsi)
 			| DSIM_MAIN_VBP(m->vtotal - m->vsync_end);
 		samsung_dsim_write(dsi, DSIM_MVPORCH_REG, reg);
 
-		reg = DSIM_MAIN_HFP((m->hsync_start - m->hdisplay) * bpp / dsi->lanes)
-			| DSIM_MAIN_HBP((m->htotal - m->hsync_end) * bpp / dsi->lanes);
+		hfp = DIV_ROUND_UP((m->hsync_start - m->hdisplay) * bpp, dsi->lanes);
+		hfp -= (hfp > DSI_HSYNC_PKT_OVERHEAD) ? DSI_HSYNC_PKT_OVERHEAD : 0;
+
+		hbp = DIV_ROUND_UP((m->htotal - m->hsync_end) * bpp, dsi->lanes);
+		hbp -= (hbp > DSI_HSYNC_PKT_OVERHEAD) ? DSI_HSYNC_PKT_OVERHEAD : 0;
+
+		hsa = DIV_ROUND_UP((m->hsync_end - m->hsync_start) * bpp, dsi->lanes);
+		hsa -= (hsa > DSI_HSYNC_PKT_OVERHEAD) ? DSI_HSYNC_PKT_OVERHEAD : 0;
+
+		reg = DSIM_MAIN_HFP(hfp) | DSIM_MAIN_HBP(hbp);
 		samsung_dsim_write(dsi, DSIM_MHPORCH_REG, reg);
 
 		reg = DSIM_MAIN_VSA(m->vsync_end - m->vsync_start)
-			| DSIM_MAIN_HSA((m->hsync_end - m->hsync_start) * bpp / dsi->lanes);
+			| DSIM_MAIN_HSA(hsa);
 		samsung_dsim_write(dsi, DSIM_MSYNC_REG, reg);
 	}
 	reg =  DSIM_MAIN_HRESOL(m->hdisplay, num_bits_resol) |
