@@ -153,6 +153,14 @@ static void tc358762_pre_enable(struct drm_bridge *bridge)
 	if (ret < 0)
 		dev_err(ctx->dev, "error enabling regulators (%d)\n", ret);
 
+	ctx->pre_enabled = true;
+}
+
+static void tc358762_enable(struct drm_bridge *bridge)
+{
+	struct tc358762 *ctx = bridge_to_tc358762(bridge);
+	int ret;
+
 	ret = tc358762_init(ctx);
 	if (ret < 0)
 		dev_err(ctx->dev, "error initializing bridge (%d)\n", ret);
@@ -172,6 +180,7 @@ static int tc358762_attach(struct drm_bridge *bridge,
 static const struct drm_bridge_funcs tc358762_bridge_funcs = {
 	.post_disable = tc358762_post_disable,
 	.pre_enable = tc358762_pre_enable,
+	.enable = tc358762_enable,
 	.attach = tc358762_attach,
 };
 
