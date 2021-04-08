@@ -3,7 +3,7 @@
  * Secure Memory / Keystore Exemplification Module
  *
  * Copyright 2012-2015 Freescale Semiconductor, Inc.
- * Copyright 2016-2019 NXP
+ * Copyright 2016-2021 NXP
  *
  * This module has been overloaded as an example to show:
  * - Secure memory subsystem initialization/shutdown
@@ -30,6 +30,13 @@
 #include "error.h"
 #include "jr.h"
 #include "sm.h"
+#include "caam_desc.h"
+#include "caam_util.h"
+
+#define SECMEM_KEYMOD_LEN 8
+#define GENMEM_KEYMOD_LEN 16
+
+#define INITIAL_DESCSZ 16	/* size of tmp buffer for descriptor const. */
 
 /* Fixed known pattern for a key modifier */
 static u8 skeymod[] = {
@@ -72,6 +79,139 @@ static u8 clrkey[] = {
 	0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7,
 	0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff
 };
+
+/*
+ * Blacken a clear key in a slot. Operates "in place".
+ * Limited to class 1 keys at the present time
+ */
+static int sm_keystore_cover_key(struct device *dev, u32 unit, u32 slot,
+				 u16 key_length, u8 keyauth)
+{
+	int retval = 0;
+	struct device *jrdev;
+	void *slotphys;
+	size_t black_key_length;
+
+	if (!dev)
+		return -EINVAL;
+	jrdev = caam_jr_alloc();
+	if (IS_ERR(jrdev))
+		return -ENOMEM;
+
+	slotphys = sm_keystore_get_slot_phys_addr(dev, unit, slot);
+	if (!slotphys) {
+		retval = -ENOMEM;
+		goto free_jr;
+	}
+
+	black_key_length = sm_keystore_get_slot_size(dev, unit, slot);
+	if (!black_key_length) {
+		retval = -ENOMEM;
+		goto free_jr;
+	}
+
+	retval = caam_black_key(jrdev,
+				slotphys, key_length, DATA_SECMEM,
+				slotphys, &black_key_length, DATA_SECMEM,
+				keyauth, UNTRUSTED_KEY);
+
+free_jr:
+	caam_jr_free(jrdev);
+
+	return retval;
+}
+
+/* Export a black/red key to a blob in external memory */
+static int sm_keystore_slot_export(struct device *ksdev, u32 unit, u32 slot,
+				   u8 keycolor, u8 keyauth,
+				   u8 *outbuf, u16 keylen, u8 *keymod)
+{
+	struct device *jrdev;
+	int retval = 0;
+	u8 __iomem *slotphys;
+	size_t blob_len;
+	size_t keymod_len = KEYMOD_SIZE_SM;
+	u8 blob_color = (keycolor == BLACK_KEY) ? BLACK_BLOB : RED_BLOB;
+
+	if (!ksdev || !outbuf || !keymod)
+		return -EINVAL;
+
+	jrdev = caam_jr_alloc();
+	if (IS_ERR(jrdev))
+		return -ENOMEM;
+
+	slotphys = sm_keystore_get_slot_phys_addr(ksdev, unit, slot);
+	if (!slotphys) {
+		retval = -ENOMEM;
+		goto free_jr;
+	}
+
+	blob_len = sm_keystore_get_slot_size(ksdev, unit, slot);
+	if (!blob_len) {
+		retval = -ENOMEM;
+		goto free_jr;
+	}
+
+	retval = caam_blobencap(jrdev,
+				 slotphys, keylen, DATA_SECMEM,
+				 keycolor, keylen,
+				 keyauth, UNTRUSTED_KEY,
+				 keymod, &keymod_len, DATA_GENMEM,
+				 outbuf, &blob_len,
+				 DATA_GENMEM, blob_color);
+
+free_jr:
+	caam_jr_free(jrdev);
+
+	return retval;
+}
+
+/* Import a black/red key from a blob residing in external memory */
+static int sm_keystore_slot_import(struct device *ksdev, u32 unit, u32 slot,
+				   u8 keycolor, u8 keyauth,
+				   u8 *inbuf, u16 keylen, u8 *keymod)
+{
+	struct device *jrdev;
+	int retval = 0;
+	u8 __iomem *slotphys;
+	size_t keymod_len = KEYMOD_SIZE_SM;
+	size_t key_len;
+	size_t secret_size = 0;
+	u8 blob_color = (keycolor == BLACK_KEY) ? BLACK_BLOB : RED_BLOB;
+
+	if (!ksdev || !inbuf || !keymod)
+		return -EINVAL;
+
+	jrdev = caam_jr_alloc();
+	if (IS_ERR(jrdev))
+		return -ENOMEM;
+
+	slotphys = sm_keystore_get_slot_phys_addr(ksdev, unit, slot);
+	if (!slotphys) {
+		retval = -ENOMEM;
+		goto free_jr;
+	}
+
+	key_len = sm_keystore_get_slot_size(ksdev, unit, slot);
+	if (!key_len) {
+		retval = -ENOMEM;
+		goto free_jr;
+	}
+
+	retval = caam_blobdecap(jrdev,
+				 inbuf, keylen + BLOB_OVERHEAD,
+				 DATA_GENMEM, blob_color,
+				 keymod, &keymod_len, DATA_GENMEM,
+				 slotphys, &key_len, DATA_SECMEM,
+				 keycolor, &secret_size,
+				 keyauth, UNTRUSTED_KEY);
+
+free_jr:
+	caam_jr_free(jrdev);
+
+	return retval;
+}
+
 
 static void key_display(struct device *dev, const char *label, u16 size,
 			u8 *key)
@@ -464,17 +604,20 @@ int caam_sm_example_init(struct platform_device *pdev)
 	if (memcmp(rstkey16, blkkey16, AES_BLOCK_PAD(16))) {
 		dev_err(ksdev, "blkkey_ex: 128-bit restored key mismatch\n");
 		rtnval = -EINVAL;
+		goto dealloc;
 	}
 
 	/* Only first AES block will match, remainder subject to padding */
 	if (memcmp(rstkey24, blkkey24, 16)) {
 		dev_err(ksdev, "blkkey_ex: 192-bit restored key mismatch\n");
 		rtnval = -EINVAL;
+		goto dealloc;
 	}
 
 	if (memcmp(rstkey32, blkkey32, AES_BLOCK_PAD(32))) {
 		dev_err(ksdev, "blkkey_ex: 256-bit restored key mismatch\n");
 		rtnval = -EINVAL;
+		goto dealloc;
 	}
 
 
@@ -497,6 +640,9 @@ freemem:
 
 	/* Disconnect from keystore and leave */
 	sm_release_keystore(ksdev, unit);
+
+	if (rtnval)
+		dev_err(ksdev, "Test failed\n");
 
 	return rtnval;
 }

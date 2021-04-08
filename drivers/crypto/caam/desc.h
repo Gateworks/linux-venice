@@ -4,11 +4,15 @@
  * Definitions to support CAAM descriptor instruction generation
  *
  * Copyright 2008-2011 Freescale Semiconductor, Inc.
- * Copyright 2018 NXP
+ * Copyright 2018-2021 NXP
  */
 
 #ifndef DESC_H
 #define DESC_H
+
+
+/* Key can be stored in plaintext form later */
+#define KEY_PTS                        0x00004000
 
 /*
  * 16-byte hardware scatter/gather table

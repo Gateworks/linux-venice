@@ -29,6 +29,12 @@ obj-$(CONFIG_CRYPTO_DEV_FSL_CAAM_SM_TEST) += sm_test.o
 obj-$(CONFIG_CRYPTO_DEV_FSL_CAAM_SECVIO) += secvio.o
 obj-$(CONFIG_CRYPTO_DEV_FSL_CAAM_TK_API_TEST) += caamkeyblob_test.o
 
+obj-$(CONFIG_CRYPTO_DEV_FSL_CAAM_DESC) += caam_desc.o
+caam_jr-$(CONFIG_CRYPTO_DEV_FSL_CAAM_UTIL) += caam_util.o
+caam_jr-$(CONFIG_CRYPTO_DEV_FSL_CAAM_UTIL_BLACK_KEY) += black_keys.o
+caam_jr-$(CONFIG_CRYPTO_DEV_FSL_CAAM_UTIL_BLOB) += blob.o
+caam_jr-$(CONFIG_CRYPTO_DEV_FSL_CAAM_KEY_BLOB) += key_blob.o
+
 caam-$(CONFIG_CRYPTO_DEV_FSL_CAAM_CRYPTO_API_QI) += qi.o
 ifneq ($(CONFIG_CRYPTO_DEV_FSL_CAAM_CRYPTO_API_QI),)
 	ccflags-y += -DCONFIG_CAAM_QI
