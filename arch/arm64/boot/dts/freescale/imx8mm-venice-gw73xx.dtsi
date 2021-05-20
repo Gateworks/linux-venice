@@ -8,6 +8,7 @@
 
 / {
 	aliases {
+		ethernet1 = &eth1;
 		usb0 = &usbotg1;
 		usb1 = &usbotg2;
 	};
@@ -31,6 +32,12 @@
 			gpios = <&gpio5 4 GPIO_ACTIVE_HIGH>;
 			default-state = "off";
 		};
+	};
+
+	pcie0_refclk: pcie0-refclk {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <100000000>;
 	};
 
 	pps {
@@ -124,6 +131,45 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c3>;
 	status = "okay";
+};
+
+&pcie0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pcie0>;
+	reset-gpio = <&gpio4 6 GPIO_ACTIVE_LOW>;
+	clocks = <&clk IMX8MM_CLK_PCIE1_ROOT>,
+		 <&clk IMX8MM_CLK_PCIE1_AUX>,
+		 <&clk IMX8MM_CLK_PCIE1_PHY>,
+		 <&pcie0_refclk>;
+	clock-names = "pcie", "pcie_aux", "pcie_phy", "pcie_bus";
+	ext_osc = <1>;
+	status = "okay";
+
+	pcie@0,0 {
+		reg = <0x0000 0 0 0 0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		pcie@1,0 {
+			reg = <0x0000 0 0 0 0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			pcie@2,4 {
+				reg = <0x2000 0 0 0 0>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				eth1: pcie@6,0 {
+					reg = <0x0000 0 0 0 0>;
+					#address-cells = <1>;
+					#size-cells = <0>;
+
+					local-mac-address = [00 00 00 00 00 00];
+				};
+			};
+		};
+	};
 };
 
 /* off-board header */
@@ -238,6 +284,12 @@
 		fsl,pins = <
 			MX8MM_IOMUXC_I2C3_SCL_I2C3_SCL		0x400001c3
 			MX8MM_IOMUXC_I2C3_SDA_I2C3_SDA		0x400001c3
+		>;
+	};
+
+	pinctrl_pcie0: pciegrp {
+		fsl,pins = <
+			MX8MM_IOMUXC_SAI1_RXD4_GPIO4_IO6	0x41
 		>;
 	};
 
