@@ -135,12 +135,12 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			pcie@2,4 {
-				reg = <0x2000 0 0 0 0>;
+			pcie@2,3 {
+				reg = <0x1800 0 0 0 0>;
 				#address-cells = <1>;
 				#size-cells = <0>;
 
-				eth1: pcie@6,0 {
+				eth1: pcie@5,0 {
 					reg = <0x0000 0 0 0 0>;
 					#address-cells = <1>;
 					#size-cells = <0>;
