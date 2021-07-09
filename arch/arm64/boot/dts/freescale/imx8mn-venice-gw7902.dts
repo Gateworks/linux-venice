@@ -80,6 +80,52 @@
 		};
 	};
 
+	led-controller {
+		compatible = "gpio-leds";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpio_leds>;
+
+		led-0 {
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "panel1";
+			gpios = <&gpio3 21 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-1 {
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "panel2";
+			gpios = <&gpio3 23 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-2 {
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "panel3";
+			gpios = <&gpio3 22 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-3 {
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "panel4";
+			gpios = <&gpio3 20 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led-4 {
+			function = LED_FUNCTION_STATUS;
+			color = <LED_COLOR_ID_GREEN>;
+			label = "panel5";
+			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+
 	pps {
 		compatible = "pps-gpio";
 		pinctrl-names = "default";
@@ -582,9 +628,9 @@
 
 	pinctrl_hog: hoggrp {
 		fsl,pins = <
-			MX8MN_IOMUXC_GPIO1_IO05_GPIO1_IO5	0x40000159 /* M2_GDIS# */
-			MX8MN_IOMUXC_GPIO1_IO13_GPIO1_IO13	0x40000041 /* M2_RST# */
-			MX8MN_IOMUXC_GPIO1_IO14_GPIO1_IO14	0x40000119 /* M2_OFF# */
+			MX8MN_IOMUXC_NAND_CE0_B_GPIO3_IO1	0x40000159 /* M2_GDIS# */
+			MX8MN_IOMUXC_GPIO1_IO12_GPIO1_IO12	0x40000041 /* M2_RST# */
+			MX8MN_IOMUXC_NAND_DATA01_GPIO3_IO7	0x40000119 /* M2_OFF# */
 			MX8MN_IOMUXC_GPIO1_IO15_GPIO1_IO15	0x40000159 /* M2_WDIS# */
 			MX8MN_IOMUXC_SAI2_RXFS_GPIO4_IO21	0x40000041 /* APP GPIO1 */
 			MX8MN_IOMUXC_SAI2_MCLK_GPIO4_IO27	0x40000041 /* APP GPIO2 */
@@ -656,6 +702,16 @@
 		fsl,pins = <
 			MX8MN_IOMUXC_I2C4_SCL_I2C4_SCL		0x400001c3
 			MX8MN_IOMUXC_I2C4_SDA_I2C4_SDA		0x400001c3
+		>;
+	};
+
+	pinctrl_gpio_leds: gpioledgrp {
+		fsl,pins = <
+			MX8MN_IOMUXC_SAI5_RXD0_GPIO3_IO21	0x19
+			MX8MN_IOMUXC_SAI5_RXD2_GPIO3_IO23	0x19
+			MX8MN_IOMUXC_SAI5_RXD1_GPIO3_IO22	0x19
+			MX8MN_IOMUXC_SAI5_RXC_GPIO3_IO20	0x19
+			MX8MN_IOMUXC_SAI5_MCLK_GPIO3_IO25	0x19
 		>;
 	};
 
