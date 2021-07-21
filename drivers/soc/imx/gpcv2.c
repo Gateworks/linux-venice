@@ -192,7 +192,7 @@ struct imx_pgc_domain {
 	struct clk_bulk_data *clks;
 	int num_clks;
 
-	unsigned int pgc;
+	unsigned long pgc;
 
 	const struct {
 		u32 pxx;
@@ -220,7 +220,7 @@ to_imx_pgc_domain(struct generic_pm_domain *genpd)
 static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 {
 	struct imx_pgc_domain *domain = to_imx_pgc_domain(genpd);
-	u32 reg_val;
+	u32 reg_val, pgc;
 	int ret;
 
 	ret = pm_runtime_get_sync(domain->dev);
@@ -264,8 +264,10 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 		}
 
 		/* disable power control */
-		regmap_update_bits(domain->regmap, GPC_PGC_CTRL(domain->pgc),
-				   GPC_PGC_CTRL_PCR, 0);
+		for_each_set_bit(pgc, &domain->pgc, 32) {
+			regmap_clear_bits(domain->regmap, GPC_PGC_CTRL(pgc),
+					  GPC_PGC_CTRL_PCR);
+		}
 	}
 
 	/* delay for reset to propagate */
@@ -307,7 +309,7 @@ out_put_pm:
 static int imx_pgc_power_down(struct generic_pm_domain *genpd)
 {
 	struct imx_pgc_domain *domain = to_imx_pgc_domain(genpd);
-	u32 reg_val;
+	u32 reg_val, pgc;
 	int ret;
 
 	/* Enable reset clocks for all devices in the domain */
@@ -334,8 +336,10 @@ static int imx_pgc_power_down(struct generic_pm_domain *genpd)
 
 	if (domain->bits.pxx) {
 		/* enable power control */
-		regmap_update_bits(domain->regmap, GPC_PGC_CTRL(domain->pgc),
-				   GPC_PGC_CTRL_PCR, GPC_PGC_CTRL_PCR);
+		for_each_set_bit(pgc, &domain->pgc, 32) {
+			regmap_update_bits(domain->regmap, GPC_PGC_CTRL(pgc),
+					   GPC_PGC_CTRL_PCR, GPC_PGC_CTRL_PCR);
+		}
 
 		/* request the domain to power down */
 		regmap_update_bits(domain->regmap, GPC_PU_PGC_SW_PDN_REQ,
@@ -385,7 +389,7 @@ static const struct imx_pgc_domain imx7_pgc_domains[] = {
 			.map = IMX7_MIPI_PHY_A_CORE_DOMAIN,
 		},
 		.voltage   = 1000000,
-		.pgc	   = IMX7_PGC_MIPI,
+		.pgc	   = BIT(IMX7_PGC_MIPI),
 	},
 
 	[IMX7_POWER_DOMAIN_PCIE_PHY] = {
@@ -397,7 +401,7 @@ static const struct imx_pgc_domain imx7_pgc_domains[] = {
 			.map = IMX7_PCIE_PHY_A_CORE_DOMAIN,
 		},
 		.voltage   = 1000000,
-		.pgc	   = IMX7_PGC_PCIE,
+		.pgc	   = BIT(IMX7_PGC_PCIE),
 	},
 
 	[IMX7_POWER_DOMAIN_USB_HSIC_PHY] = {
@@ -409,7 +413,7 @@ static const struct imx_pgc_domain imx7_pgc_domains[] = {
 			.map = IMX7_USB_HSIC_PHY_A_CORE_DOMAIN,
 		},
 		.voltage   = 1200000,
-		.pgc	   = IMX7_PGC_USB_HSIC,
+		.pgc	   = BIT(IMX7_PGC_USB_HSIC),
 	},
 };
 
@@ -444,7 +448,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.pxx = IMX8M_MIPI_SW_Pxx_REQ,
 			.map = IMX8M_MIPI_A53_DOMAIN,
 		},
-		.pgc	   = IMX8M_PGC_MIPI,
+		.pgc	   = BIT(IMX8M_PGC_MIPI),
 	},
 
 	[IMX8M_POWER_DOMAIN_PCIE1] = {
@@ -455,7 +459,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.pxx = IMX8M_PCIE1_SW_Pxx_REQ,
 			.map = IMX8M_PCIE1_A53_DOMAIN,
 		},
-		.pgc   = IMX8M_PGC_PCIE1,
+		.pgc   = BIT(IMX8M_PGC_PCIE1),
 	},
 
 	[IMX8M_POWER_DOMAIN_USB_OTG1] = {
@@ -466,7 +470,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.pxx = IMX8M_OTG1_SW_Pxx_REQ,
 			.map = IMX8M_OTG1_A53_DOMAIN,
 		},
-		.pgc   = IMX8M_PGC_OTG1,
+		.pgc   = BIT(IMX8M_PGC_OTG1),
 	},
 
 	[IMX8M_POWER_DOMAIN_USB_OTG2] = {
@@ -477,7 +481,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.pxx = IMX8M_OTG2_SW_Pxx_REQ,
 			.map = IMX8M_OTG2_A53_DOMAIN,
 		},
-		.pgc   = IMX8M_PGC_OTG2,
+		.pgc   = BIT(IMX8M_PGC_OTG2),
 	},
 
 	[IMX8M_POWER_DOMAIN_DDR1] = {
@@ -488,7 +492,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.pxx = IMX8M_DDR1_SW_Pxx_REQ,
 			.map = IMX8M_DDR2_A53_DOMAIN,
 		},
-		.pgc   = IMX8M_PGC_DDR1,
+		.pgc   = BIT(IMX8M_PGC_DDR1),
 	},
 
 	[IMX8M_POWER_DOMAIN_GPU] = {
@@ -501,7 +505,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.hskreq = IMX8M_GPU_HSK_PWRDNREQN,
 			.hskack = IMX8M_GPU_HSK_PWRDNACKN,
 		},
-		.pgc   = IMX8M_PGC_GPU,
+		.pgc   = BIT(IMX8M_PGC_GPU),
 	},
 
 	[IMX8M_POWER_DOMAIN_VPU] = {
@@ -514,7 +518,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.hskreq = IMX8M_VPU_HSK_PWRDNREQN,
 			.hskack = IMX8M_VPU_HSK_PWRDNACKN,
 		},
-		.pgc   = IMX8M_PGC_VPU,
+		.pgc   = BIT(IMX8M_PGC_VPU),
 	},
 
 	[IMX8M_POWER_DOMAIN_DISP] = {
@@ -527,7 +531,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.hskreq = IMX8M_DISP_HSK_PWRDNREQN,
 			.hskack = IMX8M_DISP_HSK_PWRDNACKN,
 		},
-		.pgc   = IMX8M_PGC_DISP,
+		.pgc   = BIT(IMX8M_PGC_DISP),
 	},
 
 	[IMX8M_POWER_DOMAIN_MIPI_CSI1] = {
@@ -538,7 +542,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.pxx = IMX8M_MIPI_CSI1_SW_Pxx_REQ,
 			.map = IMX8M_MIPI_CSI1_A53_DOMAIN,
 		},
-		.pgc   = IMX8M_PGC_MIPI_CSI1,
+		.pgc   = BIT(IMX8M_PGC_MIPI_CSI1),
 	},
 
 	[IMX8M_POWER_DOMAIN_MIPI_CSI2] = {
@@ -549,7 +553,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.pxx = IMX8M_MIPI_CSI2_SW_Pxx_REQ,
 			.map = IMX8M_MIPI_CSI2_A53_DOMAIN,
 		},
-		.pgc   = IMX8M_PGC_MIPI_CSI2,
+		.pgc   = BIT(IMX8M_PGC_MIPI_CSI2),
 	},
 
 	[IMX8M_POWER_DOMAIN_PCIE2] = {
@@ -560,7 +564,7 @@ static const struct imx_pgc_domain imx8m_pgc_domains[] = {
 			.pxx = IMX8M_PCIE2_SW_Pxx_REQ,
 			.map = IMX8M_PCIE2_A53_DOMAIN,
 		},
-		.pgc   = IMX8M_PGC_PCIE2,
+		.pgc   = BIT(IMX8M_PGC_PCIE2),
 	},
 };
 
@@ -623,7 +627,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.pxx = IMX8MM_PCIE_SW_Pxx_REQ,
 			.map = IMX8MM_PCIE_A53_DOMAIN,
 		},
-		.pgc   = IMX8MM_PGC_PCIE,
+		.pgc   = BIT(IMX8MM_PGC_PCIE),
 	},
 
 	[IMX8MM_POWER_DOMAIN_OTG1] = {
@@ -634,7 +638,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.pxx = IMX8MM_OTG1_SW_Pxx_REQ,
 			.map = IMX8MM_OTG1_A53_DOMAIN,
 		},
-		.pgc   = IMX8MM_PGC_OTG1,
+		.pgc   = BIT(IMX8MM_PGC_OTG1),
 	},
 
 	[IMX8MM_POWER_DOMAIN_OTG2] = {
@@ -645,7 +649,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.pxx = IMX8MM_OTG2_SW_Pxx_REQ,
 			.map = IMX8MM_OTG2_A53_DOMAIN,
 		},
-		.pgc   = IMX8MM_PGC_OTG2,
+		.pgc   = BIT(IMX8MM_PGC_OTG2),
 	},
 
 	[IMX8MM_POWER_DOMAIN_GPUMIX] = {
@@ -658,7 +662,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.hskreq = IMX8MM_GPUMIX_HSK_PWRDNREQN,
 			.hskack = IMX8MM_GPUMIX_HSK_PWRDNACKN,
 		},
-		.pgc   = IMX8MM_PGC_GPUMIX,
+		.pgc   = BIT(IMX8MM_PGC_GPUMIX),
 	},
 
 	[IMX8MM_POWER_DOMAIN_GPU] = {
@@ -671,7 +675,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.hskreq = IMX8MM_GPU_HSK_PWRDNREQN,
 			.hskack = IMX8MM_GPU_HSK_PWRDNACKN,
 		},
-		.pgc   = IMX8MM_PGC_GPU2D,
+		.pgc   = BIT(IMX8MM_PGC_GPU2D),
 	},
 
 	[IMX8MM_POWER_DOMAIN_VPUMIX] = {
@@ -684,7 +688,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.hskreq = IMX8MM_VPUMIX_HSK_PWRDNREQN,
 			.hskack = IMX8MM_VPUMIX_HSK_PWRDNACKN,
 		},
-		.pgc   = IMX8MM_PGC_VPUMIX,
+		.pgc   = BIT(IMX8MM_PGC_VPUMIX),
 	},
 
 	[IMX8MM_POWER_DOMAIN_VPUG1] = {
@@ -695,7 +699,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.pxx = IMX8MM_VPUG1_SW_Pxx_REQ,
 			.map = IMX8MM_VPUG1_A53_DOMAIN,
 		},
-		.pgc   = IMX8MM_PGC_VPUG1,
+		.pgc   = BIT(IMX8MM_PGC_VPUG1),
 	},
 
 	[IMX8MM_POWER_DOMAIN_VPUG2] = {
@@ -706,7 +710,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.pxx = IMX8MM_VPUG2_SW_Pxx_REQ,
 			.map = IMX8MM_VPUG2_A53_DOMAIN,
 		},
-		.pgc   = IMX8MM_PGC_VPUG2,
+		.pgc   = BIT(IMX8MM_PGC_VPUG2),
 	},
 
 	[IMX8MM_POWER_DOMAIN_VPUH1] = {
@@ -717,7 +721,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.pxx = IMX8MM_VPUH1_SW_Pxx_REQ,
 			.map = IMX8MM_VPUH1_A53_DOMAIN,
 		},
-		.pgc   = IMX8MM_PGC_VPUH1,
+		.pgc   = BIT(IMX8MM_PGC_VPUH1),
 	},
 
 	[IMX8MM_POWER_DOMAIN_DISPMIX] = {
@@ -730,7 +734,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.hskreq = IMX8MM_DISPMIX_HSK_PWRDNREQN,
 			.hskack = IMX8MM_DISPMIX_HSK_PWRDNACKN,
 		},
-		.pgc   = IMX8MM_PGC_DISPMIX,
+		.pgc   = BIT(IMX8MM_PGC_DISPMIX),
 	},
 
 	[IMX8MM_POWER_DOMAIN_MIPI] = {
@@ -741,7 +745,7 @@ static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
 			.pxx = IMX8MM_MIPI_SW_Pxx_REQ,
 			.map = IMX8MM_MIPI_A53_DOMAIN,
 		},
-		.pgc   = IMX8MM_PGC_MIPI,
+		.pgc   = BIT(IMX8MM_PGC_MIPI),
 	},
 };
 
@@ -808,7 +812,7 @@ static const struct imx_pgc_domain imx8mn_pgc_domains[] = {
 			.pxx = IMX8MN_OTG1_SW_Pxx_REQ,
 			.map = IMX8MN_OTG1_A53_DOMAIN,
 		},
-		.pgc   = IMX8MN_PGC_OTG1,
+		.pgc   = BIT(IMX8MN_PGC_OTG1),
 	},
 
 	[IMX8MN_POWER_DOMAIN_GPUMIX] = {
@@ -821,7 +825,7 @@ static const struct imx_pgc_domain imx8mn_pgc_domains[] = {
 			.hskreq = IMX8MN_GPUMIX_HSK_PWRDNREQN,
 			.hskack = IMX8MN_GPUMIX_HSK_PWRDNACKN,
 		},
-		.pgc   = IMX8MN_PGC_GPUMIX,
+		.pgc   = BIT(IMX8MN_PGC_GPUMIX),
 	},
 };
 
