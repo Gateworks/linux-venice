@@ -21,7 +21,11 @@
 
 #include "linux/printk.h"
 
+#ifdef USE_SECMEM
 #define KEY_MAX_LENGTH (512 - BLOB_OVERHEAD)
+#else
+#define KEY_MAX_LENGTH ((64 * 1024) - BLOB_OVERHEAD)
+#endif
 #define KEY_CCM_OVERHEAD 12
 
 #define KEY_COLOR_RED	0x0
@@ -99,7 +103,11 @@ static int sm_keystore_slot_export(struct device *ksdev, u32 unit, u32 slot,
 	int retval = 0;
 	u8 __iomem *slotphys;
 	size_t blob_len;
+#ifdef USE_SEcMEM
 	size_t keymod_len = KEYMOD_SIZE_SM;
+#else
+	size_t keymod_len = KEYMOD_SIZE_GM;
+#endif
 	u8 blob_color = (keycolor == BLACK_KEY) ? BLACK_BLOB : RED_BLOB;
 
 	if (!ksdev || !outbuf || !keymod)
@@ -109,6 +117,7 @@ static int sm_keystore_slot_export(struct device *ksdev, u32 unit, u32 slot,
 	if (IS_ERR(jrdev))
 		return -ENOMEM;
 
+#ifdef USE_SECMEM
 	slotphys = sm_keystore_get_slot_phys_addr(ksdev, unit, slot);
 	if (!slotphys) {
 		retval = -ENOMEM;
@@ -128,6 +137,16 @@ static int sm_keystore_slot_export(struct device *ksdev, u32 unit, u32 slot,
 				 keymod, &keymod_len, DATA_GENMEM,
 				 outbuf, &blob_len,
 				 DATA_GENMEM, blob_color);
+#else
+	blob_len = keylen + BLOB_OVERHEAD;
+	retval = caam_blobencap(jrdev,
+				 kb_addr.key_addr, keylen, DATA_GENMEM,
+				 keycolor, keylen,
+				 keyauth, UNTRUSTED_KEY,
+				 keymod, &keymod_len, DATA_GENMEM,
+				 outbuf, &blob_len,
+				 DATA_GENMEM, blob_color);
+#endif
 
 free_jr:
 	caam_jr_free(jrdev);
@@ -143,7 +162,11 @@ static int sm_keystore_slot_import(struct device *ksdev, u32 unit, u32 slot,
 	struct device *jrdev;
 	int retval = 0;
 	u8 __iomem *slotphys;
+#ifdef USE_SECMEM
 	size_t keymod_len = KEYMOD_SIZE_SM;
+#else
+	size_t keymod_len = KEYMOD_SIZE_GM;
+#endif
 	size_t key_len;
 	size_t secret_size = 0;
 	u8 blob_color = (keycolor == BLACK_KEY) ? BLACK_BLOB : RED_BLOB;
@@ -155,6 +178,7 @@ static int sm_keystore_slot_import(struct device *ksdev, u32 unit, u32 slot,
 	if (IS_ERR(jrdev))
 		return -ENOMEM;
 
+#ifdef USE_SECMEM
 	slotphys = sm_keystore_get_slot_phys_addr(ksdev, unit, slot);
 	if (!slotphys) {
 		retval = -ENOMEM;
@@ -174,6 +198,15 @@ static int sm_keystore_slot_import(struct device *ksdev, u32 unit, u32 slot,
 				 slotphys, &key_len, DATA_SECMEM,
 				 keycolor, &secret_size,
 				 keyauth, UNTRUSTED_KEY);
+#else
+	retval = caam_blobdecap(jrdev,
+				 inbuf, keylen + BLOB_OVERHEAD,
+				 DATA_GENMEM, blob_color,
+				 keymod, &keymod_len, DATA_GENMEM,
+				 kb_addr.key_addr, &key_len, DATA_GENMEM,
+				 keycolor, &secret_size,
+				 keyauth, UNTRUSTED_KEY);
+#endif
 
 free_jr:
 	caam_jr_free(jrdev);
@@ -341,7 +374,9 @@ static ssize_t kb_decap(u32 blob_len, u32 key_color, u32 key_cover)
 	} else {
 		sm_keystore_slot_alloc(ksdev, unit, blob_len - BLOB_OVERHEAD, &keyslot);
 		sm_keystore_slot_import(ksdev, unit, keyslot, key_color, key_cover, kb_addr.blob_addr, blob_len - BLOB_OVERHEAD, skeymod);
+#ifdef USE_SECMEM
 		sm_keystore_slot_read(ksdev, unit, keyslot, blob_len - BLOB_OVERHEAD, kb_addr.key_addr);
+#endif
 	}
 
 	if (copy_to_user(kb_addr_user.key_addr, kb_addr.key_addr, blob_len - BLOB_OVERHEAD))
