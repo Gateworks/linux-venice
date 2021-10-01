@@ -653,6 +653,10 @@
 	status = "okay";
 };
 
+&pgc_gpumix {
+	status = "disabled";
+};
+
 &uart1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart1>, <&pinctrl_uart1_gpio>;
