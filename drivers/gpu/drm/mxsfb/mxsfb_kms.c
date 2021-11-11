@@ -359,11 +359,12 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	drm_crtc_vblank_on(crtc);
 
 	/* If there is a bridge attached to the LCDIF, use its bus format */
-	if (mxsfb->bridge) {
+	if (mxsfb->bridge && state) {
 		bridge_state =
 			drm_atomic_get_new_bridge_state(state,
 							mxsfb->bridge);
-		bus_format = bridge_state->input_bus_cfg.format;
+		if (bridge_state)
+			bus_format = bridge_state->input_bus_cfg.format;
 		if (bus_format == MEDIA_BUS_FMT_FIXED) {
 			dev_warn_once(drm->dev,
 				      "Bridge does not provide bus format, assuming MEDIA_BUS_FMT_RGB888_1X24.\n"
