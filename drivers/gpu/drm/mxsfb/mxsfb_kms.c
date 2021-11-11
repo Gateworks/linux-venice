@@ -359,7 +359,7 @@ static void mxsfb_crtc_atomic_enable(struct drm_crtc *crtc,
 	drm_crtc_vblank_on(crtc);
 
 	/* If there is a bridge attached to the LCDIF, use its bus format */
-	if (mxsfb->bridge) {
+	if (mxsfb->bridge && state) {
 		bridge_state =
 			drm_atomic_get_new_bridge_state(state,
 							mxsfb->bridge);
