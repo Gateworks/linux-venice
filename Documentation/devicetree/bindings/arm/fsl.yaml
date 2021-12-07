@@ -408,6 +408,9 @@ properties:
               - gw,imx8mm-gw71xx-0x       # i.MX8MM Gateworks Development Kit
               - gw,imx8mm-gw72xx-0x       # i.MX8MM Gateworks Development Kit
               - gw,imx8mm-gw73xx-0x       # i.MX8MM Gateworks Development Kit
+              - gw,imx8mm-gw7901          # i.MX8MM Gateworks Board
+              - gw,imx8mm-gw7902          # i.MX8MM Gateworks Board
+              - gw,imx8mm-gw7903          # i.MX8MM Gateworks Board
               - variscite,var-som-mx8mm   # i.MX8MM Variscite VAR-SOM-MX8MM module
           - const: fsl,imx8mm
 
