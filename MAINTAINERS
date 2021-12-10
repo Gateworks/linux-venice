@@ -7180,6 +7180,11 @@ L:	linux-iio@vger.kernel.org
 S:	Maintained
 F:	drivers/iio/chemical/sen0322.c
 
+DFROBOT DFR0550 TOUCHSCREEN DRIVER
+M:	Tim Harvey <harvey.tim@gateworks.com>
+S:	Supported
+F:	drivers/input/touchscreen/dfr0550.c
+
 DH ELECTRONICS DHSOM SOM AND BOARD SUPPORT
 M:	Christoph Niedermaier <cniedermaier@dh-electronics.com>
 M:	Marek Vasut <marex@denx.de>
