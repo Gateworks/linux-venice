@@ -5460,6 +5460,11 @@ F:	include/net/devlink.h
 F:	include/uapi/linux/devlink.h
 F:	net/core/devlink.c
 
+DFR0550 TOUCHSCREEN DRIVER
+M:	Tim Harvey <harvey.tim@gateworks.com>
+S:	Supported
+F:	drivers/input/touchscreen/dfr0550.c
+
 DH ELECTRONICS IMX6 DHCOM BOARD SUPPORT
 M:	Christoph Niedermaier <cniedermaier@dh-electronics.com>
 L:	kernel@dh-electronics.com
