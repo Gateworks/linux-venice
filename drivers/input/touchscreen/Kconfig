@@ -309,6 +309,18 @@ config TOUCHSCREEN_DA9052
 	  To compile this driver as a module, choose M here: the
 	  module will be called da9052_tsi.
 
+config TOUCHSCREEN_DFR0550
+	tristate "Touchscreen support for DFROBOT DFR0550"
+	depends on I2C
+	help
+	  Say Y here to enable the support for the touchscreen found
+	  on DFROBOT DFR0550 and DFR0678 displays.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called dfr0550.
+
 config TOUCHSCREEN_DYNAPRO
 	tristate "Dynapro serial touchscreen"
 	select SERIO
