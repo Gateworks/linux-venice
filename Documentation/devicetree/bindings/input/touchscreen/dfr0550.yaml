@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: http://devicetree.org/schemas/input/touchscreen/dfr0550.yaml#
+$schema: http://devicetree.org/meta-schemas/core.yaml#
+
+title: DFRobot DFR0550 Touch Controller Bindings
+
+maintainers:
+  - Tim Harvey <tharvey@gateworks.com>
+
+allOf:
+  - $ref: touchscreen.yaml#
+
+properties:
+  compatible:
+    const: dfr,dfr0550
+
+  reg:
+    maxItems: 1
+
+  poll-interval:
+    description: Poll interval time in milliseconds.
+    $ref: /schemas/types.yaml#/definitions/uint32
+
+  touchscreen-size-x: true
+  touchscreen-size-y: true
+  touchscreen-fuzz-x: true
+  touchscreen-fuzz-y: true
+  touchscreen-inverted-x: true
+  touchscreen-inverted-y: true
+  touchscreen-swapped-x-y: true
+
+additionalProperties: false
+
+required:
+  - compatible
+  - reg
+  - poll-interval
+
+examples:
+  - |
+    i2c {
+      #address-cells = <1>;
+      #size-cells = <0>;
+
+      touchscreen@38 {
+        compatible = "dfr,dfr0550";
+        reg = <0x38>;
+      };
+    };
+
+...
