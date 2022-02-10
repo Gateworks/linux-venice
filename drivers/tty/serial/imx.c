@@ -202,6 +202,7 @@ struct imx_port {
 	unsigned int		old_status;
 	unsigned int		have_rtscts:1;
 	unsigned int		have_rtsgpio:1;
+	unsigned int		have_ctsgpio:1;
 	unsigned int		dte_mode:1;
 	unsigned int		inverted_tx:1;
 	unsigned int		inverted_rx:1;
@@ -1703,8 +1704,7 @@ imx_uart_set_termios(struct uart_port *port, struct ktermios *termios,
 		if (ucr2 & UCR2_CTS)
 			ucr2 |= UCR2_CTSC;
 	}
-
-	if (termios->c_cflag & CRTSCTS)
+	if (!sport->have_ctsgpio && termios->c_cflag & CRTSCTS)
 		ucr2 &= ~UCR2_IRTS;
 	if (termios->c_cflag & CSTOPB)
 		ucr2 |= UCR2_STPB;
@@ -2212,6 +2212,9 @@ static int imx_uart_probe_dt(struct imx_port *sport,
 
 	if (of_get_property(np, "fsl,dte-mode", NULL))
 		sport->dte_mode = 1;
+
+	if (of_get_property(np, "cts-gpios", NULL))
+		sport->have_ctsgpio = 1;
 
 	if (of_get_property(np, "rts-gpios", NULL))
 		sport->have_rtsgpio = 1;
