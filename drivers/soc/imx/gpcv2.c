@@ -184,9 +184,17 @@
 
 #define GPC_PGC_CTRL_PCR		BIT(0)
 
+struct imx_pgc_regs {
+	u16 map;
+	u16 pup;
+	u16 pdn;
+	u16 hsk;
+};
+
 struct imx_pgc_domain {
 	struct generic_pm_domain genpd;
 	struct regmap *regmap;
+	const struct imx_pgc_regs *regs;
 	struct regulator *regulator;
 	struct reset_control *reset;
 	struct clk_bulk_data *clks;
@@ -210,6 +218,7 @@ struct imx_pgc_domain_data {
 	const struct imx_pgc_domain *domains;
 	size_t domains_num;
 	const struct regmap_access_table *reg_access_table;
+	const struct imx_pgc_regs *pgc_regs;
 };
 
 static inline struct imx_pgc_domain *
@@ -252,14 +261,14 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 
 	if (domain->bits.pxx) {
 		/* request the domain to power up */
-		regmap_update_bits(domain->regmap, GPC_PU_PGC_SW_PUP_REQ,
+		regmap_update_bits(domain->regmap, domain->regs->pup,
 				   domain->bits.pxx, domain->bits.pxx);
 		/*
 		 * As per "5.5.9.4 Example Code 4" in IMX7DRM.pdf wait
 		 * for PUP_REQ/PDN_REQ bit to be cleared
 		 */
 		ret = regmap_read_poll_timeout(domain->regmap,
-					       GPC_PU_PGC_SW_PUP_REQ, reg_val,
+					       domain->regs->pup, reg_val,
 					       !(reg_val & domain->bits.pxx),
 					       0, USEC_PER_MSEC);
 		if (ret) {
@@ -281,11 +290,11 @@ static int imx_pgc_power_up(struct generic_pm_domain *genpd)
 
 	/* request the ADB400 to power up */
 	if (domain->bits.hskreq) {
-		regmap_update_bits(domain->regmap, GPC_PU_PWRHSK,
+		regmap_update_bits(domain->regmap, domain->regs->hsk,
 				   domain->bits.hskreq, domain->bits.hskreq);
 
 		/*
-		 * ret = regmap_read_poll_timeout(domain->regmap, GPC_PU_PWRHSK, reg_val,
+		 * ret = regmap_read_poll_timeout(domain->regmap, domain->regs->hsk, reg_val,
 		 *				  (reg_val & domain->bits.hskack), 0,
 		 *				  USEC_PER_MSEC);
 		 * Technically we need the commented code to wait handshake. But that needs
@@ -332,10 +341,10 @@ static int imx_pgc_power_down(struct generic_pm_domain *genpd)
 
 	/* request the ADB400 to power down */
 	if (domain->bits.hskreq) {
-		regmap_clear_bits(domain->regmap, GPC_PU_PWRHSK,
+		regmap_clear_bits(domain->regmap, domain->regs->hsk,
 				  domain->bits.hskreq);
 
-		ret = regmap_read_poll_timeout(domain->regmap, GPC_PU_PWRHSK,
+		ret = regmap_read_poll_timeout(domain->regmap, domain->regs->hsk,
 					       reg_val,
 					       !(reg_val & domain->bits.hskack),
 					       0, USEC_PER_MSEC);
@@ -353,14 +362,14 @@ static int imx_pgc_power_down(struct generic_pm_domain *genpd)
 		}
 
 		/* request the domain to power down */
-		regmap_update_bits(domain->regmap, GPC_PU_PGC_SW_PDN_REQ,
+		regmap_update_bits(domain->regmap, domain->regs->pdn,
 				   domain->bits.pxx, domain->bits.pxx);
 		/*
 		 * As per "5.5.9.4 Example Code 4" in IMX7DRM.pdf wait
 		 * for PUP_REQ/PDN_REQ bit to be cleared
 		 */
 		ret = regmap_read_poll_timeout(domain->regmap,
-					       GPC_PU_PGC_SW_PDN_REQ, reg_val,
+					       domain->regs->pdn, reg_val,
 					       !(reg_val & domain->bits.pxx),
 					       0, USEC_PER_MSEC);
 		if (ret) {
@@ -444,10 +453,18 @@ static const struct regmap_access_table imx7_access_table = {
 	.n_yes_ranges	= ARRAY_SIZE(imx7_yes_ranges),
 };
 
+static const struct imx_pgc_regs imx7_pgc_regs = {
+	.map = GPC_PGC_CPU_MAPPING,
+	.pup = GPC_PU_PGC_SW_PUP_REQ,
+	.pdn = GPC_PU_PGC_SW_PDN_REQ,
+	.hsk = GPC_PU_PWRHSK,
+};
+
 static const struct imx_pgc_domain_data imx7_pgc_domain_data = {
 	.domains = imx7_pgc_domains,
 	.domains_num = ARRAY_SIZE(imx7_pgc_domains),
 	.reg_access_table = &imx7_access_table,
+	.pgc_regs = &imx7_pgc_regs,
 };
 
 static const struct imx_pgc_domain imx8m_pgc_domains[] = {
@@ -616,6 +633,7 @@ static const struct imx_pgc_domain_data imx8m_pgc_domain_data = {
 	.domains = imx8m_pgc_domains,
 	.domains_num = ARRAY_SIZE(imx8m_pgc_domains),
 	.reg_access_table = &imx8m_access_table,
+	.pgc_regs = &imx7_pgc_regs,
 };
 
 static const struct imx_pgc_domain imx8mm_pgc_domains[] = {
@@ -806,6 +824,7 @@ static const struct imx_pgc_domain_data imx8mm_pgc_domain_data = {
 	.domains = imx8mm_pgc_domains,
 	.domains_num = ARRAY_SIZE(imx8mm_pgc_domains),
 	.reg_access_table = &imx8mm_access_table,
+	.pgc_regs = &imx7_pgc_regs,
 };
 
 static const struct imx_pgc_domain imx8mn_pgc_domains[] = {
@@ -897,6 +916,7 @@ static const struct imx_pgc_domain_data imx8mn_pgc_domain_data = {
 	.domains = imx8mn_pgc_domains,
 	.domains_num = ARRAY_SIZE(imx8mn_pgc_domains),
 	.reg_access_table = &imx8mn_access_table,
+	.pgc_regs = &imx7_pgc_regs,
 };
 
 static int imx_pgc_domain_probe(struct platform_device *pdev)
@@ -929,7 +949,7 @@ static int imx_pgc_domain_probe(struct platform_device *pdev)
 	pm_runtime_enable(domain->dev);
 
 	if (domain->bits.map)
-		regmap_update_bits(domain->regmap, GPC_PGC_CPU_MAPPING,
+		regmap_update_bits(domain->regmap, domain->regs->map,
 				   domain->bits.map, domain->bits.map);
 
 	ret = pm_genpd_init(&domain->genpd, NULL, true);
@@ -955,7 +975,7 @@ out_genpd_remove:
 	pm_genpd_remove(&domain->genpd);
 out_domain_unmap:
 	if (domain->bits.map)
-		regmap_update_bits(domain->regmap, GPC_PGC_CPU_MAPPING,
+		regmap_update_bits(domain->regmap, domain->regs->map,
 				   domain->bits.map, 0);
 	pm_runtime_disable(domain->dev);
 
@@ -970,7 +990,7 @@ static int imx_pgc_domain_remove(struct platform_device *pdev)
 	pm_genpd_remove(&domain->genpd);
 
 	if (domain->bits.map)
-		regmap_update_bits(domain->regmap, GPC_PGC_CPU_MAPPING,
+		regmap_update_bits(domain->regmap, domain->regs->map,
 				   domain->bits.map, 0);
 
 	pm_runtime_disable(domain->dev);
@@ -1101,6 +1121,7 @@ static int imx_gpcv2_probe(struct platform_device *pdev)
 
 		domain = pd_pdev->dev.platform_data;
 		domain->regmap = regmap;
+		domain->regs = domain_data->pgc_regs;
 		domain->genpd.power_on  = imx_pgc_power_up;
 		domain->genpd.power_off = imx_pgc_power_down;
 
