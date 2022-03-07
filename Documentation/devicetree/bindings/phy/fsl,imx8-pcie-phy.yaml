@@ -16,6 +16,7 @@ properties:
   compatible:
     enum:
       - fsl,imx8mm-pcie-phy
+      - fsl,imx8mp-pcie-phy
 
   reg:
     maxItems: 1
@@ -36,6 +37,7 @@ properties:
   reset-names:
     items:
       - const: pciephy
+      - const: perst
 
   fsl,refclk-pad-mode:
     description: |
