@@ -1153,6 +1153,17 @@ static int dev_alloc_name_ns(struct net *net,
 	int ret;
 
 	BUG_ON(!net);
+#ifdef CONFIG_OF
+	if (dev->dev.parent && dev->dev.parent->of_node) {
+		if (!strcmp(name, "eth%d")) {
+			ret = of_alias_get_id(dev->dev.parent->of_node, "ethernet");
+			if (ret >= 0) {
+				snprintf(dev->name, IFNAMSIZ, name, ret);
+				return ret;
+			}
+		}
+	}
+#endif
 	ret = __dev_alloc_name(net, name, buf);
 	if (ret >= 0)
 		strlcpy(dev->name, buf, IFNAMSIZ);
