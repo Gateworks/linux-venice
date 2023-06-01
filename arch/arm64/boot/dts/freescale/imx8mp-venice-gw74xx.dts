@@ -627,6 +627,7 @@
 	assigned-clock-rates = <500000000>, <10000000>;
 	assigned-clock-parents = <&clk IMX8MP_SYS_PLL2_500M>,
 				 <&clk IMX8MP_SYS_PLL2_50M>;
+	fsl,max-link-speed = <1>;
 	status = "okay";
 };
 
