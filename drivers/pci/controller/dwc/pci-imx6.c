@@ -940,8 +940,6 @@ static int imx6_pcie_start_link(struct dw_pcie *pci)
 		goto err_reset_phy;
 
 	imx6_pcie->link_is_up = true;
-	tmp = dw_pcie_readw_dbi(pci, offset + PCI_EXP_LNKSTA);
-	dev_info(dev, "Link up, Gen%i\n", tmp & PCI_EXP_LNKSTA_CLS);
 	return 0;
 
 err_reset_phy:
