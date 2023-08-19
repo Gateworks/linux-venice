@@ -57,6 +57,7 @@ enum imx6_pcie_variants {
 #define IMX6_PCIE_FLAG_IMX6_PHY			BIT(0)
 #define IMX6_PCIE_FLAG_IMX6_SPEED_CHANGE	BIT(1)
 #define IMX6_PCIE_FLAG_SUPPORTS_SUSPEND		BIT(2)
+#define IMX6_PCIE_FLAG_GEN1_LAST		BIT(3)
 
 struct imx6_pcie_drvdata {
 	enum imx6_pcie_variants variant;
@@ -806,22 +807,26 @@ static int imx6_pcie_start_link(struct dw_pcie *pci)
 	u32 tmp;
 	int ret;
 
-	/*
-	 * Force Gen1 operation when starting the link.  In case the link is
-	 * started in Gen2 mode, there is a possibility the devices on the
-	 * bus will not be detected at all.  This happens with PCIe switches.
-	 */
-	tmp = dw_pcie_readl_dbi(pci, offset + PCI_EXP_LNKCAP);
-	tmp &= ~PCI_EXP_LNKCAP_SLS;
-	tmp |= PCI_EXP_LNKCAP_SLS_2_5GB;
-	dw_pcie_writel_dbi(pci, offset + PCI_EXP_LNKCAP, tmp);
+	if (!(imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_GEN1_LAST)) {
+		/*
+		 * Force Gen1 operation when starting the link.  In case the link is
+		 * started in Gen2 mode, there is a possibility the devices on the
+		 * bus will not be detected at all.  This happens with PCIe switches.
+		 */
+		tmp = dw_pcie_readl_dbi(pci, offset + PCI_EXP_LNKCAP);
+		tmp &= ~PCI_EXP_LNKCAP_SLS;
+		tmp |= PCI_EXP_LNKCAP_SLS_2_5GB;
+		dw_pcie_writel_dbi(pci, offset + PCI_EXP_LNKCAP, tmp);
+	}
 
 	/* Start LTSSM. */
 	imx6_pcie_ltssm_enable(dev);
 
-	dw_pcie_wait_for_link(pci);
+	if (pci->link_gen >= 2 && !(imx6_pcie->drvdata->flags & IMX6_PCIE_FLAG_GEN1_LAST)) {
+		ret = dw_pcie_wait_for_link(pci);
+		if (ret)
+			goto err_reset_phy;
 
-	if (pci->link_gen >= 2) {
 		/* Allow Gen2 mode after the link is up. */
 		tmp = dw_pcie_readl_dbi(pci, offset + PCI_EXP_LNKCAP);
 		tmp &= ~PCI_EXP_LNKCAP_SLS;
@@ -853,15 +858,12 @@ static int imx6_pcie_start_link(struct dw_pcie *pci)
 				goto err_reset_phy;
 			}
 		}
-
-		/* Make sure link training is finished as well! */
-		dw_pcie_wait_for_link(pci);
-	} else {
-		dev_info(dev, "Link: Gen2 disabled\n");
 	}
 
-	tmp = dw_pcie_readw_dbi(pci, offset + PCI_EXP_LNKSTA);
-	dev_info(dev, "Link up, Gen%i\n", tmp & PCI_EXP_LNKSTA_CLS);
+	ret = dw_pcie_wait_for_link(pci);
+	if (ret)
+		goto err_reset_phy;
+
 	return 0;
 
 err_reset_phy:
@@ -1271,7 +1273,8 @@ static const struct imx6_pcie_drvdata drvdata[] = {
 	},
 	[IMX8MP] = {
 		.variant = IMX8MP,
-		.flags = IMX6_PCIE_FLAG_SUPPORTS_SUSPEND,
+		.flags = IMX6_PCIE_FLAG_SUPPORTS_SUSPEND |
+			 IMX6_PCIE_FLAG_GEN1_LAST,
 	},
 };
 
