@@ -82,6 +82,7 @@ enum imx_pcie_variants {
 #define IMX_PCIE_FLAG_HAS_SERDES		BIT(6)
 #define IMX_PCIE_FLAG_SUPPORT_64BIT		BIT(7)
 #define IMX_PCIE_FLAG_CPU_ADDR_FIXUP		BIT(8)
+#define IMX_PCIE_FLAG_GEN1_LAST			BIT(9)
 
 #define imx_check_flag(pci, val)	(pci->drvdata->flags & val)
 
@@ -841,26 +842,28 @@ static int imx_pcie_start_link(struct dw_pcie *pci)
 	u32 tmp;
 	int ret;
 
-	/*
-	 * Force Gen1 operation when starting the link.  In case the link is
-	 * started in Gen2 mode, there is a possibility the devices on the
-	 * bus will not be detected at all.  This happens with PCIe switches.
-	 */
-	dw_pcie_dbi_ro_wr_en(pci);
-	tmp = dw_pcie_readl_dbi(pci, offset + PCI_EXP_LNKCAP);
-	tmp &= ~PCI_EXP_LNKCAP_SLS;
-	tmp |= PCI_EXP_LNKCAP_SLS_2_5GB;
-	dw_pcie_writel_dbi(pci, offset + PCI_EXP_LNKCAP, tmp);
-	dw_pcie_dbi_ro_wr_dis(pci);
+	if (!(imx_pcie->drvdata->flags & IMX_PCIE_FLAG_GEN1_LAST)) {
+		/*
+		 * Force Gen1 operation when starting the link.  In case the link is
+		 * started in Gen2 mode, there is a possibility the devices on the
+		 * bus will not be detected at all.  This happens with PCIe switches.
+		 */
+		dw_pcie_dbi_ro_wr_en(pci);
+		tmp = dw_pcie_readl_dbi(pci, offset + PCI_EXP_LNKCAP);
+		tmp &= ~PCI_EXP_LNKCAP_SLS;
+		tmp |= PCI_EXP_LNKCAP_SLS_2_5GB;
+		dw_pcie_writel_dbi(pci, offset + PCI_EXP_LNKCAP, tmp);
+		dw_pcie_dbi_ro_wr_dis(pci);
+	}
 
 	/* Start LTSSM. */
 	imx_pcie_ltssm_enable(dev);
 
-	ret = dw_pcie_wait_for_link(pci);
-	if (ret)
-		goto err_reset_phy;
+	if ((pci->max_link_speed > 1) && !(imx_pcie->drvdata->flags & IMX_PCIE_FLAG_GEN1_LAST)) {
+		ret = dw_pcie_wait_for_link(pci);
+		if (ret)
+			goto err_reset_phy;
 
-	if (pci->max_link_speed > 1) {
 		/* Allow faster modes after the link is up */
 		dw_pcie_dbi_ro_wr_en(pci);
 		tmp = dw_pcie_readl_dbi(pci, offset + PCI_EXP_LNKCAP);
@@ -894,18 +897,14 @@ static int imx_pcie_start_link(struct dw_pcie *pci)
 				goto err_reset_phy;
 			}
 		}
-
-		/* Make sure link training is finished as well! */
-		ret = dw_pcie_wait_for_link(pci);
-		if (ret)
-			goto err_reset_phy;
-	} else {
-		dev_info(dev, "Link: Only Gen1 is enabled\n");
 	}
 
+	ret = dw_pcie_wait_for_link(pci);
+	if (ret)
+		goto err_reset_phy;
+
 	imx_pcie->link_is_up = true;
-	tmp = dw_pcie_readw_dbi(pci, offset + PCI_EXP_LNKSTA);
-	dev_info(dev, "Link up, Gen%i\n", tmp & PCI_EXP_LNKSTA_CLS);
+
 	return 0;
 
 err_reset_phy:
@@ -1563,7 +1562,8 @@ static const struct imx_pcie_drvdata drvdata[] = {
 		.variant = IMX8MM,
 		.flags = IMX_PCIE_FLAG_SUPPORTS_SUSPEND |
 			 IMX_PCIE_FLAG_HAS_PHYDRV |
-			 IMX_PCIE_FLAG_HAS_APP_RESET,
+			 IMX_PCIE_FLAG_HAS_APP_RESET |
+			 IMX_PCIE_FLAG_GEN1_LAST,
 		.gpr = "fsl,imx8mm-iomuxc-gpr",
 		.clk_names = imx8mm_clks,
 		.clks_cnt = ARRAY_SIZE(imx8mm_clks),
@@ -1575,7 +1575,8 @@ static const struct imx_pcie_drvdata drvdata[] = {
 		.variant = IMX8MP,
 		.flags = IMX_PCIE_FLAG_SUPPORTS_SUSPEND |
 			 IMX_PCIE_FLAG_HAS_PHYDRV |
-			 IMX_PCIE_FLAG_HAS_APP_RESET,
+			 IMX_PCIE_FLAG_HAS_APP_RESET |
+			 IMX_PCIE_FLAG_GEN1_LAST,
 		.gpr = "fsl,imx8mp-iomuxc-gpr",
 		.clk_names = imx8mm_clks,
 		.clks_cnt = ARRAY_SIZE(imx8mm_clks),
