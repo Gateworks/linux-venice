@@ -210,7 +210,7 @@ static int imx8_pcie_phy_init(struct phy *phy)
 		ret = regmap_read_poll_timeout(imx8_phy->hsio_blk_ctrl,
 					     IMX8MP_GPR_REG1, val,
 					     val & IMX8MP_GPR_PM_EN_CORE_CLK,
-					     10, 20000);
+					     10, 25000);
 		if (ret) {
 			dev_err(imx8_phy->dev, "PCIe CORE CLK enable failed\n");
 			return ret;
