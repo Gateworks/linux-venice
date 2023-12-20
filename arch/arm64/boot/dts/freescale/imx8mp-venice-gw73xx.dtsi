@@ -176,7 +176,7 @@
 
 	bluetooth {
 		compatible = "brcm,bcm4330-bt";
-		shutdown-gpios = <&gpio4 16 GPIO_ACTIVE_HIGH>;
+		shutdown-gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
 	};
 };
 
@@ -283,7 +283,7 @@
 
 	pinctrl_bten: btengrp {
 		fsl,pins = <
-			MX8MP_IOMUXC_SAI1_TXD4__GPIO4_IO16	0x146
+			MX8MP_IOMUXC_GPIO1_IO03__GPIO1_IO03	0x146
 		>;
 	};
 
