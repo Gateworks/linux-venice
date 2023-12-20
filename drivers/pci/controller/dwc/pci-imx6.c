@@ -864,6 +864,11 @@ static int imx6_pcie_start_link(struct dw_pcie *pci)
 	if (ret)
 		goto err_reset_phy;
 
+	tmp = dw_pcie_readw_dbi(pci, offset + PCI_EXP_LNKSTA);
+	dev_info(pci->dev, "PCIe Gen.%u x%u link up\n",
+		 FIELD_GET(PCI_EXP_LNKSTA_CLS, tmp),
+		 FIELD_GET(PCI_EXP_LNKSTA_NLW, tmp));
+
 	return 0;
 
 err_reset_phy:
