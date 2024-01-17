@@ -1,0 +1,72 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2020 Gateworks Corporation
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/clock/imx8mm-clock.h>
+#include "imx8mm-pinfunc.h"
+
+/dts-v1/;
+/plugin/;
+
+&{/} {
+	sound {
+		compatible = "simple-audio-card";
+		simple-audio-card,aux-devs = <&speaker_amp>;
+		simple-audio-card,name = "SGTL5000-Card";
+		simple-audio-card,widgets = "Microphone", "Microphone Jack",
+					    "Speaker", "Speaker Jack";
+		simple-audio-card,routing = "MIC_IN", "Microphone Jack",
+					    "Speaker Jack", "LINE_OUT";
+		simple-audio-card,dai-link@0 {
+			format = "i2s";
+			bitclock-master = <&cpu_dai>;
+			frame-master = <&cpu_dai>;
+
+			cpu_dai: cpu {
+				sound-dai = <&sai3>;
+			};
+
+			sgtl5000_codec: codec {
+				sound-dai = <&sgtl5000>;
+			};
+		};
+
+
+	};
+
+	speaker_amp: speaker-amp {
+		compatible = "simple-audio-amplifier";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_spkamp>;
+		sound-name-prefix = "Speaker Amp";
+		enable-gpios = <&gpio4 4 GPIO_ACTIVE_LOW>;
+	};
+};
+
+
+&i2c3 {
+	/* Audio codec */
+	sgtl5000: audio-codec@a {
+		compatible = "fsl,sgtl5000";
+		reg = <0x0a>;
+		#sound-dai-cells = <0>;
+		clocks = <&clk IMX8MM_CLK_SAI3_ROOT>;
+		VDDA-supply = <&reg_3p3v>;
+		VDDIO-supply = <&reg_3p3v>;
+		micbias-voltage-m-volts = <2000>;
+	};
+};
+
+&sai3 {
+	fsl,sai-mclk-direction-output;
+};
+
+&iomuxc {
+	pinctrl_spkamp: spkampgrp {
+		fsl,pins = <
+			MX8MM_IOMUXC_SAI1_RXD2_GPIO4_IO4	0x40000041  /* SD# */
+		>;
+	};
+};
