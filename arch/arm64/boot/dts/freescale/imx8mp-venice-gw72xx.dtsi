@@ -183,6 +183,7 @@
 					#address-cells = <3>;
 					#size-cells = <2>;
 					ranges;
+
 					local-mac-address = [00 00 00 00 00 00];
 				};
 			};
