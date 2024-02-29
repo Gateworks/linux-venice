@@ -8,6 +8,10 @@
 #include <dt-bindings/phy/phy-imx8-pcie.h>
 
 / {
+	aliases {
+		ethernet1 = &eth1;
+	};
+
 	led-controller {
 		compatible = "gpio-leds";
 		pinctrl-names = "default";
@@ -156,6 +160,39 @@
 	assigned-clock-rates = <10000000>;
 	assigned-clock-parents = <&clk IMX8MP_SYS_PLL2_50M>;
 	status = "okay";
+
+	pcie@0,0 {
+		reg = <0x0000 0 0 0 0>;
+		device_type = "pci";
+		#address-cells = <3>;
+		#size-cells = <2>;
+		ranges;
+
+		pcie@0,0 {
+			reg = <0x0000 0 0 0 0>;
+			device_type = "pci";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			ranges;
+
+			pcie@4,0 {
+				reg = <0x2000 0 0 0 0>;
+				device_type = "pci";
+				#address-cells = <3>;
+				#size-cells = <2>;
+				ranges;
+
+				eth1: ethernet@0,0 {
+					reg = <0x0000 0 0 0 0>;
+					#address-cells = <3>;
+					#size-cells = <2>;
+					ranges;
+
+					local-mac-address = [00 00 00 00 00 00];
+				};
+			};
+		};
+	};
 };
 
 /* GPS */
