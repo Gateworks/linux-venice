@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright 2024 Gateworks Corporation
+ */
+
+/dts-v1/;
+
+#include "imx8mm.dtsi"
+#include "imx8mm-venice-gw700x.dtsi"
+#include "imx8mm-venice-gw82xx.dtsi"
+
+/ {
+	model = "Gateworks Venice GW82xx-0x i.MX8MM Development Kit";
+	compatible = "gw,imx8mm-gw82xx-0x", "fsl,imx8mm";
+
+	chosen {
+		stdout-path = &uart2;
+	};
+};
