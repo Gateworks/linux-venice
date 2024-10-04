@@ -2344,11 +2344,19 @@ static u32 ksz_get_phy_flags(struct dsa_switch *ds, int port)
 		if (!port)
 			return MICREL_KSZ8_P1_ERRATA;
 		break;
+	case KSZ8795_CHIP_ID:
+	case KSZ8794_CHIP_ID:
+	case KSZ8765_CHIP_ID:
+		/* KSZ87xx DS80000687C Module 2 */
+	case KSZ9896_CHIP_ID:
+		/* KSZ9896 Errata DS80000757A Module 2 */
+	case KSZ9897_CHIP_ID:
+		/* KSZ9897 Errata DS00002394C Module 4 */
+	case KSZ9567_CHIP_ID:
+		/* KSZ9567 Errata DS80000756A Module 4 */
 	case KSZ9477_CHIP_ID:
-		/* KSZ9477 Errata DS80000754C
-		 *
-		 * Module 4: Energy Efficient Ethernet (EEE) feature select must
-		 * be manually disabled
+		/* KSZ9477 Errata DS80000754C Module 4 */
+		/* Energy Efficient Ethernet (EEE) feature select must be manually disabled
 		 *   The EEE feature is enabled by default, but it is not fully
 		 *   operational. It must be manually disabled through register
 		 *   controls. If not disabled, the PHY ports can auto-negotiate
