@@ -187,7 +187,7 @@
 		#address-cells = <0x1>;
 		#size-cells = <0x1>;
 		reg = <0x0>;
-		spi-max-frequency = <36000000>;
+		spi-max-frequency = <30000000>;
 	};
 };
 
