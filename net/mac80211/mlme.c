@@ -1992,7 +1992,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 	}
 
 	/* channel switch handled in software */
-	timeout = TU_TO_JIFFIES((max_t(int, csa_ie.count, 1) - 1) *
+	timeout = TU_TO_JIFFIES((max_t(int, csa_ie.count, 1) - 1) * sdata->vif.bss_conf.dtim_period *
 				cbss->beacon_interval);
 	wiphy_delayed_work_queue(local->hw.wiphy,
 				 &link->u.mgd.chswitch_work,
