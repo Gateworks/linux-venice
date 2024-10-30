@@ -749,6 +749,10 @@ struct ieee80211_if_mesh {
 	int mesh_paths_generation;
 	int mpp_paths_generation;
 	struct mesh_tx_cache tx_cache;
+	 enum {
+		IEEE80211_MESH_MFP_DISABLED,
+		IEEE80211_MESH_MFP_ENABLED,
+	} mfp; /* management frame protection */
 };
 
 #ifdef CONFIG_MAC80211_MESH

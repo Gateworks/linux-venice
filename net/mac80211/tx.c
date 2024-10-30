@@ -4286,6 +4286,12 @@ void __ieee80211_subif_start_xmit(struct sk_buff *skb,
 		if (fast_tx &&
 		    ieee80211_xmit_fast(sdata, sta, fast_tx, skb))
 			goto out;
+	} else if (ieee80211_vif_is_mesh(&sdata->vif)) {
+		/* For mesh interface, sta is determined in ieee80211_tx_prepare after building
+		 * mesh header. Update tx pacing shift here, otherwise it affects TCP throughput as
+		 * there won't be enough packets to aggregate.
+		 */
+		sk_pacing_shift_update(skb->sk, sdata->local->hw.tx_sk_pacing_shift);
 	}
 
 	/* the frame could be fragmented, software-encrypted, and other
