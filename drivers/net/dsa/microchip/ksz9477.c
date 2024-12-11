@@ -1064,25 +1064,24 @@ void ksz9477_config_cpu_port(struct dsa_switch *ds)
 	}
 }
 
-int ksz9477_enable_stp_addr(struct ksz_device *dev)
+static int ksz9477_reserved_muticast_group(struct ksz_device *dev, int index, int mask)
 {
+	const u8 *shifts;
 	const u32 *masks;
 	u32 data;
 	int ret;
 
+	shifts = dev->info->shifts;
 	masks = dev->info->masks;
 
-	/* Enable Reserved multicast table */
-	ksz_cfg(dev, REG_SW_LUE_CTRL_0, SW_RESV_MCAST_ENABLE, true);
-
-	/* Set the Override bit for forwarding BPDU packet to CPU */
-	ret = ksz_write32(dev, REG_SW_ALU_VAL_B,
-			  ALU_V_OVERRIDE | BIT(dev->cpu_port));
+	/* write the PORT_FORWARD value to the Reserved Multicast Address Table Entry 2 Register */
+	ret = ksz_write32(dev, REG_SW_ALU_VAL_B, mask);
 	if (ret < 0)
 		return ret;
 
-	data = ALU_STAT_START | ALU_RESV_MCAST_ADDR | masks[ALU_STAT_WRITE];
-
+	/* write to the Static Address and Reserved Multicast Table Control Register */
+	data = (index << shifts[ALU_STAT_INDEX]) |
+		ALU_STAT_START | ALU_RESV_MCAST_ADDR | masks[ALU_STAT_WRITE];
 	ret = ksz_write32(dev, REG_SW_ALU_STAT_CTRL__4, data);
 	if (ret < 0)
 		return ret;
@@ -1093,8 +1092,75 @@ int ksz9477_enable_stp_addr(struct ksz_device *dev)
 		dev_err(dev->dev, "Failed to update Reserved Multicast table\n");
 		return ret;
 	}
+	return ksz9477_wait_alu_sta_ready(dev);
+}
+
+int ksz9477_enable_stp_addr(struct ksz_device *dev)
+{
+	int ret;
+	int cpu_mask = dsa_cpu_ports(dev->ds);
+	int user_mask = dsa_user_ports(dev->ds);
+	/* array of indexes into table:
+	 * The table is indexed by the low 6 bits of the MAC address.
+	 * Changing the PORT_FORWARD value for any single address affects
+	 * all others in group
+	 */
+	u16 addr_groups[8] = {
+		/* group 0: (01-80-C2-00)-00-00 (Bridge Group Data) */
+		0x000,
+		/* group 1: (01-80-C2-00)-00-01 (MAC Control Frame) */
+		0x001,
+		/* group 2: (01-80-C2-00)-00-03 (802.1X access control) */
+		0x003,
+		/* group 3: (01-80-C2-00)-00-10) (Bridge Management) */
+		0x010,
+		/* group 4: (01-80-C2-00)-00-20 (GMRP) */
+		0x020,
+		/* group 5: (01-80-C2-00)-00-21 (GVRP) */
+		0x021,
+		/* group 6: (01-80-C2-00)-00-02, (01-80-C2-00)-00-04 – (01-80-C2-00)-00-0F */
+		0x002,
+		/* group 7: (01-80-C2-00)-00-11 - (01-80-C2-00)-00-1F,
+		 *          (01-80-C2-00)-00-22 - (01-80-C2-00)-00-2F
+		 */
+		0x011,
+	};
+
+	/* Enable Reserved multicast table */
+	ksz_cfg(dev, REG_SW_LUE_CTRL_0, SW_RESV_MCAST_ENABLE, true);
+
+	/* update reserved multicast address table:
+	 * leave as default:
+	 *  - group 1 (01-80-C2-00)-00-01 (MAC Control Frame) (drop)
+	 *  - group 3 (01-80-C2-00)-00-10) (Bridge Management) (all ports)
+	 * forward to cpu port:
+	 *  - group 0 (01-80-C2-00)-00-00 (Bridge Group Data)
+	 *  - group 2 (01-80-C2-00)-00-03 (802.1X access control)
+	 *  - group 6 (01-80-C2-00)-00-02, (01-80-C2-00)-00-04 – (01-80-C2-00)-00-0F
+	 * forward to all but cpu port:
+	 *  - group 4 (01-80-C2-00)-00-20 (GMRP)
+	 *  - group 5 (01-80-C2-00)-00-21 (GVRP)
+	 *  - group 7 (01-80-C2-00)-00-11 - (01-80-C2-00)-00-1F,
+	 *            (01-80-C2-00)-00-22 - (01-80-C2-00)-00-2F
+	 */
+	if (ksz9477_reserved_muticast_group(dev, addr_groups[0], cpu_mask))
+		goto exit;
+	if (ksz9477_reserved_muticast_group(dev, addr_groups[2], cpu_mask))
+		goto exit;
+	if (ksz9477_reserved_muticast_group(dev, addr_groups[6], cpu_mask))
+		goto exit;
+	if (ksz9477_reserved_muticast_group(dev, addr_groups[4], user_mask))
+		goto exit;
+	if (ksz9477_reserved_muticast_group(dev, addr_groups[5], user_mask))
+		goto exit;
+	if (ksz9477_reserved_muticast_group(dev, addr_groups[7], user_mask))
+		goto exit;
 
 	return 0;
+
+exit:
+	dev_err(dev->dev, "Failed to update Reserved Multicast table\n");
+	return ret;
 }
 
 int ksz9477_setup(struct dsa_switch *ds)
