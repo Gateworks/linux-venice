@@ -136,6 +136,17 @@
 		st,drdy-int-pin = <1>;
 	};
 
+	gpio@20 {
+		compatible = "nxp,pca9555";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+
+		gpio-line-names =
+			"fsa1_gpio3", "fsa2_gpio3", "fsa1_card_pen", "fsa2_card_pen",
+			"fsa2_present#", "fsa1_present#", "", "";
+	};
+
 	magnetometer@1e {
 		compatible = "st,lis2mdl";
 		reg = <0x1e>;
