@@ -484,8 +484,15 @@ int dw_pcie_host_init(struct dw_pcie_rp *pp)
 			goto err_free_msi;
 	}
 
+/* for IMX6 this is already called in imx6_pcie_start_link; it does no harm
+ * but no good either and duplicates the link-up message. This call is likely
+ * needed for other DWC host controllers so we'll be cautions and skip it
+ * only for IMX6.
+ */
+#ifndef CONFIG_PCI_IMX6
 	/* Ignore errors, the link may come up later */
 	dw_pcie_wait_for_link(pci);
+#endif
 
 	bridge->sysdata = pp;
 
