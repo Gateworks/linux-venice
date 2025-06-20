@@ -1125,6 +1125,9 @@ static int nl80211_msg_put_channel(struct sk_buff *msg, struct wiphy *wiphy,
 	if ((chan->flags & IEEE80211_CHAN_DISABLED) &&
 	    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_DISABLED))
 		goto nla_put_failure;
+	if ((chan->flags & IEEE80211_CHAN_IGNORE) &&
+	    nla_put_flag(msg, NL80211_FREQUENCY_ATTR_DISABLED))
+		goto nla_put_failure;
 	if (chan->flags & IEEE80211_CHAN_NO_IR) {
 		if (nla_put_flag(msg, NL80211_FREQUENCY_ATTR_NO_IR))
 			goto nla_put_failure;
