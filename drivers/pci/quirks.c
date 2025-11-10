@@ -45,6 +45,23 @@ static bool pcie_lbms_seen(struct pci_dev *dev, u16 lnksta)
 }
 
 /*
+ * pwr_det_ctrl (bit 0) in LTSSM 15 register offset 0x3cc is off by default
+ * and when on enables a power saving function for empty ports. Enable this
+ */
+static void pi7c9x2g608gp_fixup(struct pci_dev *dev)
+{
+	u32 dw;
+
+	if (!dev->devfn)
+		return;
+
+	dev_info(&dev->dev, "enabling power savings\n");
+	pci_read_config_dword(dev, 0x3cc, &dw);
+	pci_write_config_dword(dev, 0x3cc, dw | BIT(0));
+};
+DECLARE_PCI_FIXUP_FINAL(0x12d8, 0xc008, pi7c9x2g608gp_fixup);
+
+/*
  * Retrain the link of a downstream PCIe port by hand if necessary.
  *
  * This is needed at least where a downstream port of the ASMedia ASM2824
