@@ -74,7 +74,7 @@
 	status = "okay";
 };
 
-&gpio4 {
+&gpio1 {
 	gpio-line-names =
 		"", "", "", "",
 		"", "", "", "",
