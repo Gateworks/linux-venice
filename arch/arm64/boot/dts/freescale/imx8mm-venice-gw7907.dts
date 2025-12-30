@@ -206,11 +206,12 @@
 		pinctrl-0 = <&pinctrl_reg_isouart>;
 		compatible = "regulator-fixed";
 		regulator-name = "iso_uart";
-		gpio = <&gpio1 13 GPIO_ACTIVE_LOW>;
+		gpio = <&gpio1 13 GPIO_ACTIVE_HIGH>;
 		startup-delay-us = <100>;
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		regulator-always-on;
+		enable-active-high;
 	};
 
 	reg_usb2_vbus: regulator-usb2 {
