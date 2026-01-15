@@ -26,6 +26,15 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 
+	touchscreen@38 {
+		compatible = "dfr,dfr0550";
+		reg = <0x38>;
+		poll-interval = <17>; /* 17:60fps */
+		invert;
+		screen-x = <800>;
+		screen-y = <480>;
+	};
+
 	attiny: regulator@45 {
 		compatible = "raspberrypi,7inch-touchscreen-panel-regulator";
 		reg = <0x45>;
