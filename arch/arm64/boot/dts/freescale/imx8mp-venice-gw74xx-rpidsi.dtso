@@ -7,8 +7,6 @@
 /plugin/;
 
 &{/} {
-	compatible = "gateworks,imx8mp-gw74xx", "fsl,imx8mp";
-
 	panel {
 		compatible = "powertip,ph800480t013-idf02";
 		power-supply = <&attiny>;
