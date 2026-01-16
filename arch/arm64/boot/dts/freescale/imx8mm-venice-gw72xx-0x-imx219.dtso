@@ -11,8 +11,6 @@
 /plugin/;
 
 &{/} {
-	compatible = "gw,imx8mm-gw72xx-0x", "fsl,imx8mm";
-
 	reg_vana: regulator-2p8v {
 		compatible = "regulator-fixed";
 		regulator-name = "2P8V";
