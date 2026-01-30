@@ -3228,6 +3228,12 @@ static u32 ksz_get_phy_flags(struct dsa_switch *ds, int port)
 		if (!port)
 			return MICREL_KSZ8_P1_ERRATA;
 		break;
+	case KSZ9477_CHIP_ID:
+		/* KSZ9477S Errata DS80000754F: Module 19 */
+		return MICREL_KSZ9_LED_ERRATA;
+	case KSZ9897_CHIP_ID:
+		/* KSZ9897S Errata DS80000759F: Module 18 */
+		return MICREL_KSZ9_LED_ERRATA;
 	}
 
 	return 0;
@@ -3416,6 +3422,22 @@ static int ksz_port_setup(struct dsa_switch *ds, int port)
 	 */
 
 	return ksz_dcb_init_port(dev, port);
+}
+
+static void ksz_enable_single_led_mode(struct ksz_device *dev, int port,
+				       struct phy_device *phydev)
+{
+	ksz_phy_write16(dev->ds, port, MII_MMD_CTRL, 0x0002);
+	ksz_phy_write16(dev->ds, port,  MII_MMD_DATA, 0x0000);
+	ksz_phy_write16(dev->ds, port, MII_MMD_CTRL, MII_MMD_CTRL_NOINCR | 0x02);
+	ksz_phy_write16(dev->ds, port,  MII_MMD_DATA, 0x0010); /* set bit 4 */
+	/* KSZ9477 errata requires writing 0xfa00 to Debug Register 3
+	 * to enable Single-LED mode.
+	 */
+	if (phydev->dev_flags & MICREL_KSZ9_LED_ERRATA)
+		ksz_phy_write16(dev->ds, port, 0x1e, 0xfa00);
+
+	dev_info(dev->dev, "port-%d: single-led mode enabled.\n", port);
 }
 
 void ksz_port_stp_state_set(struct dsa_switch *ds, int port, u8 state)
@@ -3963,6 +3985,9 @@ static void ksz9477_phylink_mac_link_up(struct phylink_config *config,
 	struct ksz_device *dev = dp->ds->priv;
 	int port = dp->index;
 	struct ksz_port *p;
+
+	if (dev->single_led_mode && port != dev->cpu_port)
+		ksz_enable_single_led_mode(dev, port, phydev);
 
 	p = &dev->ports[port];
 
@@ -5513,6 +5538,8 @@ int ksz_switch_register(struct ksz_device *dev)
 							   "wakeup-source");
 		dev->pme_active_high = of_property_read_bool(dev->dev->of_node,
 							     "microchip,pme-active-high");
+		dev->single_led_mode = of_property_read_bool(dev->dev->of_node,
+							     "microchip,single-led-mode");
 	}
 
 	ret = dsa_register_switch(dev->ds);
